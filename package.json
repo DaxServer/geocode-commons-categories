@@ -1,0 +1,16 @@
+{
+  "name": "geocode-commons-categories",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "bun": "1.3.7"
+  }
+}
