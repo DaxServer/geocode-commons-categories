@@ -42,7 +42,7 @@ HOST=0.0.0.0
 ## Running
 
 ```bash
-bun index.ts
+bun src/index.ts
 ```
 
 ## API Endpoints

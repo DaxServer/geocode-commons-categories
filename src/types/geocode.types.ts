@@ -5,6 +5,8 @@ export const coordinateSchema = t.Object({
   lon: t.Number(),
 })
 
+export type Coordinate = typeof coordinateSchema.static
+
 export const geocodeResponseSchema = t.Object({
   admin_level: t.Number(),
   commons_cat: t.Object({
@@ -18,20 +20,9 @@ export const geocodeResponseSchema = t.Object({
   wikidata: t.String(),
 })
 
-export interface GeocodeResponse {
-  admin_level: number
-  commons_cat: {
-    title: string
-    url: string
-  }
-  coords: {
-    lat: number
-    lon: number
-  }
-  wikidata: string
-}
+export type GeocodeResponse = typeof geocodeResponseSchema.static
 
-export interface AdminBoundaryRow {
+export type AdminBoundaryRow = {
   wikidata_id: string
   commons_category: string
   admin_level: number

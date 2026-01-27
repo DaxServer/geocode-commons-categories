@@ -11,7 +11,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<GeocodeR
     admin_level: boundary.admin_level,
     commons_cat: {
       title: boundary.commons_category,
-      url: `https://commons.wikimedia.org/wiki/Category:${boundary.commons_category}`,
+      url: `https://commons.wikimedia.org/wiki/Category:${encodeURIComponent(boundary.commons_category)}`,
     },
     coords: { lat, lon },
     wikidata: boundary.wikidata_id,
