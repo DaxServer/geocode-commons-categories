@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- Administrative boundaries table
-CREATE TABLE admin_boundaries (
+CREATE TABLE IF NOT EXISTS admin_boundaries (
   id SERIAL PRIMARY KEY,
   wikidata_id VARCHAR(20) UNIQUE NOT NULL,
   commons_category VARCHAR(255) NOT NULL,

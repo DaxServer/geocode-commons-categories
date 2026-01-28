@@ -18,23 +18,6 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  migrate:
-    image: postgis/postgis:17-3.4-alpine
-    environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: geocode
-      PGPASSWORD: geocode
-      PGDATABASE: geocode
-    volumes:
-      - ./migrations:/migrations:ro
-      - ./scripts/wait-for-postgres.sh:/wait-for-postgres.sh:ro
-    command: ["/bin/sh", "-c", "/wait-for-postgres.sh && psql -f /migrations/001_initial_schema.sql"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
   app:
     build:
       context: .
