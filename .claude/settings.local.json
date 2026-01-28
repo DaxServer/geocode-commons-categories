@@ -10,7 +10,8 @@
       "Bash(but:*)",
       "Bash(docker compose:*)",
       "Bash(docker volume rm:*)",
-      "Bash(gh pr checks:*)"
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr view:*)"
     ]
   }
 }
