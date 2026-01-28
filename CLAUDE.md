@@ -88,8 +88,10 @@ docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
 
 - **postgres**: PostgreSQL 17 + PostGIS 3.4 Alpine, exposes port 5432
 - **app**: Bun API server, exposes port 3000
-- **migrate**: One-time migration runner, exits after completion
 
 ### Docker Compose Patterns
 
 - Use `docker compose` (modern syntax, not `docker-compose`)
+- Migrations mount to `/docker-entrypoint-initdb.d` and run automatically on postgres start
+- Use `IF NOT EXISTS` in migrations for idempotency (safe to re-run with fresh volumes)
+- Always test Docker changes with `docker compose down -v && docker compose up -d` before committing
