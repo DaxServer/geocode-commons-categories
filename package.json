@@ -9,12 +9,17 @@
     "typecheck": "bun --bun tsc --noEmit",
     "lint": "bun biome check .",
     "format": "bun biome format --write .",
-    "format:check": "bun biome format --write . && bun biome check ."
+    "format:check": "bun biome format --write . && bun biome check .",
+    "import:data": "bun run src/scripts/import/index.ts",
+    "import:osm": "bun run src/scripts/import/fetch-osm.ts",
+    "import:database": "bun run src/scripts/import/database.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.13",
     "@types/bun": "latest",
-    "@types/pg": "^8.16.0"
+    "@types/geojson": "^7946.0.16",
+    "@types/pg": "^8.16.0",
+    "geojson": "^0.5.0"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"

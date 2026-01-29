@@ -49,6 +49,36 @@ src/
 
 - **Environment variables**: Access via `Bun.env` (Bun-native, not process.env)
 
+## Code Style Patterns
+
+- Use `type` aliases instead of `interface` declarations for type definitions
+- Access properties on `Record<string, string>` index signatures with bracket notation: `obj['key']` (required by TypeScript strict mode)
+- Biome's `useLiteralKeys` rule is disabled to avoid conflicts with TypeScript index signature requirements
+
+## Data Import Scripts
+
+The project includes a data import system in `src/scripts/` for populating the database:
+
+```
+src/scripts/
+├── import/
+│   ├── index.ts           # Main orchestrator
+│   ├── fetch-osm.ts       # Fetch OSM boundaries via Overpass API
+│   ├── transform.ts       # Transform and enrich data
+│   └── database.ts        # Batch insert to PostgreSQL
+└── utils/
+    ├── overpass.ts        # Overpass API client
+    ├── wikidata-api.ts    # Wikidata REST API client (fetches Commons categories)
+    └── sparql.ts          # Wikimedia Commons API validation
+```
+
+### Import Architecture
+
+- **OSM data**: Fetched via Overpass API with wikidata tags already present
+- **Wikidata data**: Use Wikidata REST API (`wbgetentities` action) instead of SPARQL - simpler and more reliable
+- **Batch processing**: Wikidata API accepts up to 50 IDs per request with 100ms rate limiting between batches
+- **Environment variables**: Import scripts use required env vars (COUNTRY_CODE, ADMIN_LEVELS, BATCH_SIZE, etc.) defined in `env.d.ts`
+
 ## Runtime Environment
 
 - **Runtime**: Bun 1.3.7 (required - specified in `package.json` engines field)
@@ -70,8 +100,8 @@ The project uses strict TypeScript configuration with several safety features en
 ## Database Setup
 
 1. Run migration: `psql -d your_database -f migrations/001_initial_schema.sql`
-2. Configure `DATABASE_URL` in `.env` (see `.env.example`)
-3. Import boundary data from Wikidata/OpenStreetMap (future work)
+2. Configure `DATABASE_URL` in environment variables (see `.env.example`)
+3. Import boundary data: `bun src/scripts/import` (requires COUNTRY_CODE and other env vars)
 
 ## Docker Development
 
@@ -92,6 +122,6 @@ docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
 ### Docker Compose Patterns
 
 - Use `docker compose` (modern syntax, not `docker-compose`)
-- Migrations mount to `/docker-entrypoint-initdb.d` and run automatically on postgres start
+- Migrations in `migrations/` directory mount to `/docker-entrypoint-initdb.d` and run automatically on postgres start
 - Use `IF NOT EXISTS` in migrations for idempotency (safe to re-run with fresh volumes)
 - Always test Docker changes with `docker compose down -v && docker compose up -d` before committing
