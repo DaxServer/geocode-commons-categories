@@ -72,3 +72,26 @@ The project uses strict TypeScript configuration with several safety features en
 1. Run migration: `psql -d your_database -f migrations/001_initial_schema.sql`
 2. Configure `DATABASE_URL` in `.env` (see `.env.example`)
 3. Import boundary data from Wikidata/OpenStreetMap (future work)
+
+## Docker Development
+
+```bash
+docker compose up -d      # Start all services (postgres, app)
+docker compose down       # Stop services
+docker compose down -v    # Stop and remove volumes (fresh start)
+docker compose ps         # Check service status
+docker compose logs app   # View app logs
+docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
+```
+
+### Docker Services
+
+- **postgres**: PostgreSQL 17 + PostGIS 3.4 Alpine, exposes port 5432
+- **app**: Bun API server, exposes port 3000
+
+### Docker Compose Patterns
+
+- Use `docker compose` (modern syntax, not `docker-compose`)
+- Migrations mount to `/docker-entrypoint-initdb.d` and run automatically on postgres start
+- Use `IF NOT EXISTS` in migrations for idempotency (safe to re-run with fresh volumes)
+- Always test Docker changes with `docker compose down -v && docker compose up -d` before committing

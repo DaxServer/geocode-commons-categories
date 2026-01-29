@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- Administrative boundaries table
-CREATE TABLE admin_boundaries (
+CREATE TABLE IF NOT EXISTS admin_boundaries (
   id SERIAL PRIMARY KEY,
   wikidata_id VARCHAR(20) UNIQUE NOT NULL,
   commons_category VARCHAR(255) NOT NULL,
@@ -13,10 +13,10 @@ CREATE TABLE admin_boundaries (
 );
 
 -- Spatial index for fast point-in-polygon queries
-CREATE INDEX idx_admin_boundaries_geom ON admin_boundaries USING GIST(geom);
+CREATE INDEX IF NOT EXISTS idx_admin_boundaries_geom ON admin_boundaries USING GIST(geom);
 
 -- Index for admin_level queries
-CREATE INDEX idx_admin_boundaries_admin_level ON admin_boundaries(admin_level);
+CREATE INDEX IF NOT EXISTS idx_admin_boundaries_admin_level ON admin_boundaries(admin_level);
 
 -- Index for Wikidata lookups
-CREATE INDEX idx_admin_boundaries_wikidata ON admin_boundaries(wikidata_id);
+CREATE INDEX IF NOT EXISTS idx_admin_boundaries_wikidata ON admin_boundaries(wikidata_id);
