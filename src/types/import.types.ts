@@ -77,9 +77,9 @@ export type ImportStats = {
  * Import configuration
  */
 export type ImportConfig = {
-  countryCode?: string
-  adminLevels?: number[]
-  batchSize?: number
-  skipWikidata?: boolean
-  outputDir?: string
+  countryCode: string
+  adminLevels: number[]
+  batchSize: number
+  skipWikidata: boolean
+  outputDir: string
 }
