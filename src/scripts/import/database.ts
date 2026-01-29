@@ -8,13 +8,31 @@ import type { AdminBoundaryImport, ImportStats } from '../../types/import.types'
 const { Pool } = pg
 
 /**
- * Initialize database connection pool
+ * Singleton database connection pool
+ */
+let poolInstance: pg.Pool | null = null
+
+/**
+ * Get or create database connection pool
  */
 function getPool(): pg.Pool {
-  return new Pool({
-    connectionString: Bun.env.DATABASE_URL,
-    max: 10, // Maximum number of clients in the pool
-  })
+  if (!poolInstance) {
+    poolInstance = new Pool({
+      connectionString: Bun.env.DATABASE_URL,
+      max: 10, // Maximum number of clients in the pool
+    })
+  }
+  return poolInstance
+}
+
+/**
+ * Close database connection pool
+ */
+export async function closePool(): Promise<void> {
+  if (poolInstance) {
+    await poolInstance.end()
+    poolInstance = null
+  }
 }
 
 /**
@@ -39,87 +57,77 @@ export async function batchInsertBoundaries(
 
   const pool = getPool()
 
-  try {
-    // Test connection
-    await pool.query('SELECT 1')
-    console.log('Database connection established')
+  // Test connection
+  await pool.query('SELECT 1')
+  console.log('Database connection established')
 
-    // Process in batches
-    for (let i = 0; i < boundaries.length; i += batchSize) {
-      const batch = boundaries.slice(i, i + batchSize)
-      const batchNum = Math.floor(i / batchSize) + 1
-      const totalBatches = Math.ceil(boundaries.length / batchSize)
+  // Process in batches
+  for (let i = 0; i < boundaries.length; i += batchSize) {
+    const batch = boundaries.slice(i, i + batchSize)
+    const batchNum = Math.floor(i / batchSize) + 1
+    const totalBatches = Math.ceil(boundaries.length / batchSize)
 
-      console.log(`\nProcessing batch ${batchNum}/${totalBatches} (${batch.length} records)`)
+    console.log(`\nProcessing batch ${batchNum}/${totalBatches} (${batch.length} records)`)
+
+    try {
+      const client = await pool.connect()
 
       try {
-        const client = await pool.connect()
+        await client.query('BEGIN')
 
-        try {
-          await client.query('BEGIN')
+        const insertQuery = `
+          INSERT INTO admin_boundaries (wikidata_id, commons_category, admin_level, name, geom)
+          VALUES ($1, $2, $3, $4, ST_GeomFromEWKT($5))
+          ON CONFLICT (wikidata_id) DO UPDATE
+            SET commons_category = EXCLUDED.commons_category,
+                admin_level = EXCLUDED.admin_level,
+                name = EXCLUDED.name,
+                geom = EXCLUDED.geom
+        `
 
-          // Actually, let's use parameterized INSERT for simplicity
-          // It's slower but more reliable with the pg library
-          await client.query('ROLLBACK') // Rollback the COPY attempt
-
-          await client.query('BEGIN')
-
-          const insertQuery = `
-            INSERT INTO admin_boundaries (wikidata_id, commons_category, admin_level, name, geom)
-            VALUES ($1, $2, $3, $4, ST_GeomFromEWKT($5))
-            ON CONFLICT (wikidata_id) DO UPDATE
-              SET commons_category = EXCLUDED.commons_category,
-                  admin_level = EXCLUDED.admin_level,
-                  name = EXCLUDED.name,
-                  geom = EXCLUDED.geom
-          `
-
-          for (const boundary of batch) {
-            try {
-              await client.query(insertQuery, [
-                boundary.wikidata_id,
-                boundary.commons_category,
-                boundary.admin_level,
-                boundary.name,
-                boundary.geom,
-              ])
-              stats.insertedRecords++
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : String(error)
-              console.error(`Error inserting ${boundary.name}:`, errorMessage)
-              stats.errors.push({
-                record: boundary.name,
-                error: errorMessage,
-              })
-            }
+        for (const boundary of batch) {
+          try {
+            await client.query(insertQuery, [
+              boundary.wikidata_id,
+              boundary.commons_category,
+              boundary.admin_level,
+              boundary.name,
+              boundary.geom,
+            ])
+            stats.insertedRecords++
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error(`Error inserting ${boundary.name}:`, errorMessage)
+            stats.errors.push({
+              record: boundary.name,
+              error: errorMessage,
+            })
           }
-
-          await client.query('COMMIT')
-          console.log(`Batch ${batchNum} committed: ${stats.insertedRecords} total inserted`)
-        } catch (error) {
-          await client.query('ROLLBACK')
-          throw error
-        } finally {
-          client.release()
         }
+
+        await client.query('COMMIT')
+        console.log(`Batch ${batchNum} committed: ${stats.insertedRecords} total inserted`)
       } catch (error) {
-        console.error(`Batch ${batchNum} failed:`, error)
-        // Continue with next batch
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
       }
+    } catch (error) {
+      console.error(`Batch ${batchNum} failed:`, error)
+      // Continue with next batch
     }
+  }
 
-    console.log(`\n=== Import Complete ===`)
-    console.log(`Successfully inserted: ${stats.insertedRecords}`)
-    console.log(`Errors: ${stats.errors.length}`)
+  console.log(`\n=== Import Complete ===`)
+  console.log(`Successfully inserted: ${stats.insertedRecords}`)
+  console.log(`Errors: ${stats.errors.length}`)
 
-    if (stats.errors.length > 0) {
-      console.log('\nFirst 10 errors:')
-      stats.errors.slice(0, 10).forEach(({ record, error }) => {
-        console.log(`  - ${record}: ${error}`)
-      })
-    }
-  } finally {
-    await pool.end()
+  if (stats.errors.length > 0) {
+    console.log('\nFirst 10 errors:')
+    stats.errors.slice(0, 10).forEach(({ record, error }) => {
+      console.log(`  - ${record}: ${error}`)
+    })
   }
 
   return stats
@@ -133,48 +141,44 @@ export async function verifyImport(): Promise<void> {
 
   const pool = getPool()
 
-  try {
-    // Count total records
-    const countResult = await pool.query('SELECT COUNT(*) as count FROM admin_boundaries')
-    console.log(`Total records in database: ${countResult.rows[0].count}`)
+  // Count total records
+  const countResult = await pool.query('SELECT COUNT(*) as count FROM admin_boundaries')
+  console.log(`Total records in database: ${countResult.rows[0].count}`)
 
-    // Count by admin_level
-    const levelResult = await pool.query(`
-      SELECT admin_level, COUNT(*) as count
-      FROM admin_boundaries
-      GROUP BY admin_level
-      ORDER BY admin_level
-    `)
-    console.log('\nRecords by admin level:')
-    levelResult.rows.forEach((row) => {
-      console.log(`  Level ${row.admin_level}: ${row.count}`)
-    })
+  // Count by admin_level
+  const levelResult = await pool.query(`
+    SELECT admin_level, COUNT(*) as count
+    FROM admin_boundaries
+    GROUP BY admin_level
+    ORDER BY admin_level
+  `)
+  console.log('\nRecords by admin level:')
+  levelResult.rows.forEach((row) => {
+    console.log(`  Level ${row.admin_level}: ${row.count}`)
+  })
 
-    // Check for NULL critical fields
-    const nullResult = await pool.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE wikidata_id IS NULL) as null_wikidata,
-        COUNT(*) FILTER (WHERE commons_category IS NULL) as null_commons,
-        COUNT(*) FILTER (WHERE name IS NULL) as null_name,
-        COUNT(*) FILTER (WHERE geom IS NULL) as null_geom
-      FROM admin_boundaries
-    `)
-    console.log('\nNULL field counts:')
-    console.log(`  Wikidata ID: ${nullResult.rows[0].null_wikidata}`)
-    console.log(`  Commons category: ${nullResult.rows[0].null_commons}`)
-    console.log(`  Name: ${nullResult.rows[0].null_name}`)
-    console.log(`  Geometry: ${nullResult.rows[0].null_geom}`)
+  // Check for NULL critical fields
+  const nullResult = await pool.query(`
+    SELECT
+      COUNT(*) FILTER (WHERE wikidata_id IS NULL) as null_wikidata,
+      COUNT(*) FILTER (WHERE commons_category IS NULL) as null_commons,
+      COUNT(*) FILTER (WHERE name IS NULL) as null_name,
+      COUNT(*) FILTER (WHERE geom IS NULL) as null_geom
+    FROM admin_boundaries
+  `)
+  console.log('\nNULL field counts:')
+  console.log(`  Wikidata ID: ${nullResult.rows[0].null_wikidata}`)
+  console.log(`  Commons category: ${nullResult.rows[0].null_commons}`)
+  console.log(`  Name: ${nullResult.rows[0].null_name}`)
+  console.log(`  Geometry: ${nullResult.rows[0].null_geom}`)
 
-    // Validate geometries
-    const invalidGeomResult = await pool.query(`
-      SELECT COUNT(*) as count
-      FROM admin_boundaries
-      WHERE ST_IsValid(geom) = false
-    `)
-    console.log(`\nInvalid geometries: ${invalidGeomResult.rows[0].count}`)
-  } finally {
-    await pool.end()
-  }
+  // Validate geometries
+  const invalidGeomResult = await pool.query(`
+    SELECT COUNT(*) as count
+    FROM admin_boundaries
+    WHERE ST_IsValid(geom) = false
+  `)
+  console.log(`\nInvalid geometries: ${invalidGeomResult.rows[0].count}`)
 }
 
 /**
@@ -201,6 +205,8 @@ export async function main() {
   } catch (error) {
     console.error('Import failed:', error)
     process.exit(1)
+  } finally {
+    await closePool()
   }
 }
 

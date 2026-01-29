@@ -12,7 +12,6 @@
     "format:check": "bun biome format --write . && bun biome check .",
     "import:data": "bun run src/scripts/import/index.ts",
     "import:osm": "bun run src/scripts/import/fetch-osm.ts",
-    "import:wikidata": "bun run src/scripts/import/fetch-wikidata.ts",
     "import:database": "bun run src/scripts/import/database.ts"
   },
   "devDependencies": {
@@ -30,8 +29,6 @@
   },
   "dependencies": {
     "elysia": "^1.4.22",
-    "graphql-request": "^7.4.0",
-    "node-fetch": "^3.3.2",
     "pg": "^8.17.2"
   }
 }

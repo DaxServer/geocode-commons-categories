@@ -62,9 +62,15 @@ function convertToGeoJSON(elements: OverpassResponse['elements']): OverpassFeatu
       currentRing.push([point.lon, point.lat])
     }
 
-    if (currentRing.length > 0) {
-      coordinates.push(currentRing)
+    // A valid polygon ring must have at least 4 points (closed ring)
+    if (currentRing.length < 4) {
+      console.warn(
+        `Skipping element ${element.id}: insufficient geometry points (${currentRing.length})`,
+      )
+      continue
     }
+
+    coordinates.push(currentRing)
 
     const wikidata = element.tags['wikidata']
 
@@ -79,17 +85,7 @@ function convertToGeoJSON(elements: OverpassResponse['elements']): OverpassFeatu
       },
       geometry: {
         type: 'Polygon',
-        coordinates:
-          coordinates.length > 0
-            ? coordinates
-            : [
-                [
-                  [0, 0],
-                  [0, 0],
-                  [0, 0],
-                  [0, 0],
-                ],
-              ],
+        coordinates,
       },
     })
   }
@@ -162,7 +158,7 @@ export async function fetchBoundaries(
     osmId: feature.id,
     name: feature.properties['name'],
     adminLevel: parseInt(feature.properties['admin_level'], 10),
-    geometry: feature.properties['geometry'] as unknown as GeoJSON.Polygon,
+    geometry: feature.geometry as GeoJSON.Polygon,
     tags: feature.properties as Record<string, string>,
   }))
 }
@@ -203,7 +199,7 @@ export async function fetchBoundariesByBBox(
     osmId: feature.id,
     name: feature.properties['name'],
     adminLevel: parseInt(feature.properties['admin_level'], 10),
-    geometry: feature.properties['geometry'] as unknown as GeoJSON.Polygon,
+    geometry: feature.geometry as GeoJSON.Polygon,
     tags: feature.properties as Record<string, string>,
   }))
 }

@@ -5,9 +5,9 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ImportConfig } from '../../types/import.types'
-import { batchValidateCommonsCategories } from '../utils/sparql'
 import { fetchWikimediaCategoriesBatch } from '../utils/wikidata-api'
-import { batchInsertBoundaries, verifyImport } from './database'
+import { batchValidateCommonsCategories } from '../utils/wikimedia-commons-api'
+import { batchInsertBoundaries, closePool, verifyImport } from './database'
 import { fetchOSMData } from './fetch-osm'
 import { transformBoundaries } from './transform'
 
@@ -138,6 +138,8 @@ export async function runImport(config: ImportConfig): Promise<void> {
   } catch (error) {
     console.error('\n❌ Import failed:', error)
     process.exit(1)
+  } finally {
+    await closePool()
   }
 }
 
@@ -154,7 +156,11 @@ export async function main() {
 
   const config: ImportConfig = {
     countryCode,
-    adminLevels: adminLevelsStr?.split(',').map(Number) || [],
+    adminLevels:
+      adminLevelsStr
+        ?.split(',')
+        .map((s) => parseInt(s, 10))
+        .filter((n) => !Number.isNaN(n)) || [],
     batchSize: batchSizeStr ? parseInt(batchSizeStr, 10) : undefined,
     skipWikidata: skipWikidataStr === 'true',
     outputDir,

@@ -45,7 +45,11 @@ export async function fetchOSMData(config: ImportConfig): Promise<OSMBoundary[]>
 export async function main() {
   const countryCode = Bun.env.COUNTRY_CODE
   const adminLevelsStr = Bun.env.ADMIN_LEVELS
-  const adminLevels = adminLevelsStr?.split(',').map(Number) || []
+  const adminLevels =
+    adminLevelsStr
+      ?.split(',')
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !Number.isNaN(n)) || []
   const outputDir = Bun.env.OUTPUT_DIR
 
   const config: ImportConfig = {
