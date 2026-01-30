@@ -41,9 +41,7 @@ function buildBoundaryQuery(countryCode?: string, adminLevels?: number[]): strin
 /**
  * Type guards for Overpass elements
  */
-function isRelation(
-  element: { type: string },
-): element is {
+function isRelation(element: { type: string }): element is {
   type: 'relation'
   id: number
   tags?: Record<string, string>
