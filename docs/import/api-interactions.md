@@ -36,7 +36,7 @@ graph TB
         ENDPOINT[Endpoint<br/>https://overpass-api.de/api/interpreter]
         METHOD[Method<br/>POST]
         FORMAT[Format<br/>JSON]
-        TIMEOUT[Timeout<br/>25 seconds]
+        TIMEOUT[Timeout<br/>90 seconds]
     end
 
     subgraph "Query Format"
@@ -61,7 +61,7 @@ graph TB
 graph TD
     START[Build Query] --> BASE[Set base parameters]
     BASE --> OUT[out:json]
-    OUT --> TIMEOUT_Q[timeout:25]
+    OUT --> TIMEOUT_Q[timeout:90]
 
     TIMEOUT_Q --> FILTER[Build filters]
     FILTER --> ADMIN[admin_level filter]
@@ -220,7 +220,7 @@ graph LR
     subgraph "Overpass API Limits"
         L1[No official rate limit]
         L2[Server-side load balancing]
-        L3[Timeout: 25s default]
+        L3[Timeout: 90s default]
     end
 
     subgraph "Client Strategy"

@@ -29,7 +29,7 @@ bun import:data
 
 # Or run individual stages
 bun import:osm        # Fetch OSM data only
-bun import:database   # Insert to database only
+bun import:database   # Insert to database only (requires INPUT_FILE)
 ```
 
 ## Key Concepts
@@ -69,6 +69,7 @@ graph LR
 | `OUTPUT_DIR` | No | "./output" | Intermediate file output directory |
 | `DATABASE_URL` | Yes | - | PostgreSQL connection string |
 | `SKIP_WIKIDATA` | No | false | Skip Wikidata enrichment stage |
+| `INPUT_FILE` | No* | - | JSON file for database-only import (required for `bun import:database`) |
 
 ## Performance Characteristics
 

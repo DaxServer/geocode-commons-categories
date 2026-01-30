@@ -17,62 +17,67 @@ graph TB
         A7 --> A8["Save to output/osm-country.json"]
     end
 
-    subgraph "Stage 2: Extract & Enrich"
-        A8 --> B1[Extract Wikidata IDs]
-        B1 --> B2{Has IDs?}
-        B2 -->|No| B3[Skip Wikidata Stage]
-        B2 -->|Yes| B4[Split into Batches of 50]
-        B4 --> B5[For Each Batch]
-        B5 --> B6[POST to Wikidata API]
-        B6 --> B7[Extract P373 Property]
-        B7 --> B8[Add to Category Map]
-        B8 --> B9{More Batches?}
-        B9 -->|Yes| B10[Wait 100ms]
-        B10 --> B5
-        B9 -->|No| B11[Complete Category Map]
+    subgraph "Stage 2: Extract Wikidata IDs"
+        A8 --> B1[Extract Wikidata IDs from Tags]
+        B1 --> B2[Format IDs<br/>Strip URL and Q prefix]
+        B2 --> B3{Has IDs?}
+        B3 -->|No| B4[Skip Wikidata Stage]
+        B3 -->|Yes| B5[Pass to Stage 3]
     end
 
-    subgraph "Stage 3: Transform"
-        B3 --> C1[Read OSM Boundaries]
-        B11 --> C1
-        C1 --> C2[For Each Boundary]
-        C2 --> C3{Has Wikidata Tag?}
-        C3 -->|No| C4[Skip Record]
-        C3 -->|Yes| C5{Has Category?}
-        C5 -->|No| C4
-        C5 -->|Yes| C6[Validate Geometry]
-        C6 --> C7{Valid?}
-        C7 -->|No| C4
-        C7 -->|Yes| C8[Convert to EWKT]
-        C8 --> C9[Add to Results]
-        C9 --> C10{More Records?}
-        C10 -->|Yes| C2
-        C10 -->|No| C11[Remove Duplicates]
-        C11 --> C12[Final Dataset]
+    subgraph "Stage 3: Fetch Wikidata Categories"
+        B5 --> C1[Split into Batches of 50]
+        C1 --> C2[For Each Batch]
+        C2 --> C3[GET Wikidata API]
+        C3 --> C4[Extract P373 Property]
+        C4 --> C5[Add to Category Map]
+        C5 --> C6{More Batches?}
+        C6 -->|Yes| C7[Wait 100ms]
+        C7 --> C2
+        C6 -->|No| C8[Complete Category Map]
     end
 
-    subgraph "Stage 4: Database Insert"
-        C12 --> D1[Connect to PostgreSQL]
-        D1 --> D2[Split into Batches of 1000]
-        D2 --> D3[For Each Batch]
-        D3 --> D4[Begin Transaction]
-        D4 --> D5[Insert Records]
-        D5 --> D6{Success?}
-        D6 -->|Yes| D7[Commit Transaction]
-        D6 -->|No| D8[Rollback]
-        D8 --> D9[Log Error]
-        D7 --> D10{More Batches?}
-        D10 -->|Yes| D3
-        D10 -->|No| D11[Close Connection]
+    subgraph "Stage 4: Transform"
+        B4 --> D1[Read OSM Boundaries]
+        C8 --> D1
+        D1 --> D2[For Each Boundary]
+        D2 --> D3{Has Wikidata Tag?}
+        D3 -->|No| D4[Skip Record]
+        D3 -->|Yes| D5{Has Category?}
+        D5 -->|No| D4
+        D5 -->|Yes| D6[Validate Geometry]
+        D6 --> D7{Valid?}
+        D7 -->|No| D4
+        D7 -->|Yes| D8[Convert to EWKT]
+        D8 --> D9[Add to Results]
+        D9 --> D10{More Records?}
+        D10 -->|Yes| D2
+        D10 -->|No| D11[Remove Duplicates]
+        D11 --> D12[Final Dataset]
     end
 
-    subgraph "Stage 5: Verification"
-        D11 --> E1[Query Total Count]
-        E1 --> E2[Group by Admin Level]
-        E2 --> E3[Check for NULLs]
-        E3 --> E4[Validate Geometries]
-        E4 --> E5[Display Statistics]
-        E5 --> E6[Import Complete]
+    subgraph "Stage 5: Database Insert"
+        D12 --> E1[Connect to PostgreSQL]
+        E1 --> E2[Split into Batches of 1000]
+        E2 --> E3[For Each Batch]
+        E3 --> E4[Begin Transaction]
+        E4 --> E5[Insert Records<br/>ON CONFLICT DO UPDATE]
+        E5 --> E6{Success?}
+        E6 -->|Yes| E7[Commit Transaction]
+        E6 -->|No| E8[Rollback]
+        E8 --> E9[Log Error]
+        E7 --> E10{More Batches?}
+        E10 -->|Yes| E3
+        E10 -->|No| E11[Close Connection]
+    end
+
+    subgraph "Stage 6: Verification"
+        E11 --> F1[Query Total Count]
+        F1 --> F2[Group by Admin Level]
+        F2 --> F3[Check for NULLs]
+        F3 --> F4[Validate Geometries]
+        F4 --> F5[Display Statistics]
+        F5 --> F6[Import Complete]
     end
 
 ```
@@ -108,8 +113,10 @@ sequenceDiagram
     OSM-->>Orch: OSMBoundary[]
     deactivate OSM
 
-    Note over Orch,WD: Stage 2: Fetch Wikidata Categories
-    Orch->>Orch: Extract Wikidata IDs
+    Note over Orch: Stage 2: Extract Wikidata IDs
+    Orch->>Orch: Extract and format IDs
+
+    Note over Orch,Wikidata: Stage 3: Fetch Wikidata Categories
     Orch->>WD: fetchWikimediaCategoriesBatch(ids)
     activate WD
     loop For each batch of 50 IDs
@@ -121,7 +128,7 @@ sequenceDiagram
     WD-->>Orch: Map<string, string>
     deactivate WD
 
-    Note over Orch,Transform: Stage 3: Transform Data
+    Note over Orch,Transform: Stage 4: Transform Data
     Orch->>Transform: transformBoundaries(osmData, categories)
     activate Transform
     loop For each OSM boundary
@@ -133,19 +140,19 @@ sequenceDiagram
     Transform-->>Orch: AdminBoundaryImport[]
     deactivate Transform
 
-    Note over Orch,DB: Stage 4: Insert to Database
+    Note over Orch,DB: Stage 5: Insert to Database
     Orch->>DB: batchInsertBoundaries(data)
     activate DB
     loop For each batch of 1000 records
         DB->>PG: BEGIN TRANSACTION
-        DB->>PG: INSERT INTO boundaries
+        DB->>PG: INSERT INTO admin_boundaries
         PG-->>DB: Result
         DB->>PG: COMMIT
     end
     DB-->>Orch: Import result
     deactivate DB
 
-    Note over Orch,PG: Stage 5: Verification
+    Note over Orch,PG: Stage 6: Verification
     Orch->>PG: SELECT COUNT(*)
     PG-->>Orch: Total count
     Orch->>PG: SELECT admin_level, COUNT(*)
@@ -168,7 +175,7 @@ sequenceDiagram
     activate Fetch
 
     Fetch->>Fetch: Build Overpass QL query
-    Note over Fetch: out:json timeout:25<br/>relation admin_level filter<br/>wikidata tag required<br/>out geom
+    Note over Fetch: out:json timeout:90<br/>relation admin_level filter<br/>wikidata tag required<br/>out geom
 
     Fetch->>Retry: Execute with retry
     activate Retry
@@ -278,7 +285,7 @@ sequenceDiagram
         activate Tx
 
         loop For each record
-            DB->>PG: INSERT INTO boundaries<br/>(wikidata_id, commons_category,<br/>admin_level, name, geom)<br/>VALUES ($1, $2, $3, $4, $5)
+            DB->>PG: INSERT INTO admin_boundaries<br/>(wikidata_id, commons_category,<br/>admin_level, name, geom)<br/>VALUES ($1, $2, $3, $4, $5)<br/>ON CONFLICT DO UPDATE
             PG-->>DB: Insert result
         end
 
@@ -381,11 +388,19 @@ stateDiagram-v2
         SavingFile --> [*]
     }
 
-    FetchingOSM --> FetchingWikidata: OSM data ready
+    FetchingOSM --> ExtractingIDs: OSM data ready
+
+    state ExtractingIDs {
+        [*] --> ParseWikidataTags
+        ParseWikidataTags --> FormatIDs
+        FormatIDs --> [*]
+    }
+
+    ExtractingIDs --> FetchingWikidata: Has IDs
+    ExtractingIDs --> SkippingWikidata: No IDs or SKIP_WIKIDATA
 
     state FetchingWikidata {
-        [*] --> ExtractIDs
-        ExtractIDs --> CreateBatches
+        [*] --> CreateBatches
         CreateBatches --> ProcessingBatches
 
         ProcessingBatches --> FetchBatch: Next batch
@@ -394,8 +409,6 @@ stateDiagram-v2
         RateLimitDelay --> ProcessingBatches: More batches?
         ProcessingBatches --> [*]: All batches done
     }
-
-    FetchingWikidata --> SkippingWikidata: No IDs or SKIP_WIKIDATA
 
     state SkippingWikidata {
         [*] --> LogSkip

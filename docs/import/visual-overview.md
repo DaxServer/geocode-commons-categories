@@ -13,10 +13,11 @@ graph TB
 
     subgraph "📥 Import Pipeline"
         STAGE1[Stage 1: Fetch OSM<br/>Overpass QL queries<br/>Retry with backoff]
-        STAGE2[Stage 2: Fetch Wikidata<br/>Batch 50 IDs<br/>100ms delay]
-        STAGE3[Stage 3: Transform<br/>Validate geometries<br/>Remove duplicates]
-        STAGE4[Stage 4: Database<br/>Batch 1000 records<br/>Transaction safety]
-        STAGE5[Stage 5: Verify<br/>Count records<br/>Check integrity]
+        STAGE2[Stage 2: Extract IDs<br/>Parse wikidata tags<br/>Format IDs]
+        STAGE3[Stage 3: Fetch Wikidata<br/>Batch 50 IDs<br/>100ms delay]
+        STAGE4[Stage 4: Transform<br/>Validate geometries<br/>Remove duplicates]
+        STAGE5[Stage 5: Database<br/>Batch 1000 records<br/>Transaction safety]
+        STAGE6[Stage 6: Verify<br/>Count records<br/>Check integrity]
     end
 
     subgraph "💾 Storage"
@@ -27,12 +28,13 @@ graph TB
     OSM_API --> STAGE1
     STAGE1 --> CACHE
     STAGE1 --> STAGE2
-    WD_API --> STAGE2
     STAGE2 --> STAGE3
+    WD_API --> STAGE3
     STAGE3 --> STAGE4
-    STAGE4 --> POSTGRES
     STAGE4 --> STAGE5
     STAGE5 --> POSTGRES
+    STAGE5 --> STAGE6
+    STAGE6 --> POSTGRES
 
 ```
 
@@ -104,23 +106,27 @@ gantt
     dateFormat X
     axisFormat %s
 
-    section Fetch OSM
+    section Stage 1: Fetch OSM
     Query Overpass API     :0, 5
     Parse Response         :5, 10
     Save to File           :10, 12
 
-    section Fetch Wikidata
-    Extract IDs            :12, 13
+    section Stage 2: Extract IDs
+    Extract Wikidata IDs   :12, 13
+
+    section Stage 3: Fetch Wikidata
     Batch Processing       :13, 50
     Build Category Map     :50, 52
 
-    section Transform
+    section Stage 4: Transform
     Enrich Data            :52, 60
     Validate Geometries    :60, 70
     Remove Duplicates      :70, 72
 
-    section Database
+    section Stage 5: Database
     Batch Insert           :72, 80
+
+    section Stage 6: Verify
     Verification           :80, 82
 ```
 
@@ -316,93 +322,16 @@ graph TB
 
 ```
 
-## Documentation Navigation
-
-```mermaid
-mindmap
-  root((Import System<br/>Documentation))
-    README[Getting Started]
-      Quick Start Guide
-      Environment Variables
-      Key Concepts
-      Troubleshooting
-    ARCH[Architecture]
-      System Overview
-      Module Responsibilities
-      Configuration
-      Database Design
-      Technology Stack
-    FLOW[Data Flow]
-      Pipeline Overview
-      Sequence Diagrams
-      State Transitions
-      Entity Flows
-      Filter Logic
-    API[API Interactions]
-      Overpass API
-      Wikidata API
-      Request/Response
-      Rate Limiting
-      Best Practices
-    ERROR[Error Handling]
-      Error Taxonomy
-      Retry Logic
-      Recovery Strategies
-      Stage-Specific
-      Logging
-    VISUAL[Visual Overview]
-      Pipeline at a Glance
-      Component Map
-      Timing Diagram
-      Performance
-      Metrics
-```
-
-## Quick Reference Card
-
-```mermaid
-graph TB
-    subgraph "Commands"
-        CMD1[bun import:data<br/>Full pipeline]
-        CMD2[bun import:osm<br/>Fetch OSM only]
-        CMD3[bun import:database<br/>Insert to DB]
-    end
-
-    subgraph "Required Env Vars"
-        ENV1[COUNTRY_CODE]
-        ENV2[DATABASE_URL]
-    end
-
-    subgraph "Key Files"
-        F1[src/scripts/import/index.ts<br/>Orchestrator]
-        F2[src/scripts/import/fetch-osm.ts<br/>OSM fetcher]
-        F3[src/scripts/utils/wikidata-api.ts<br/>Wikidata client]
-        F4[src/scripts/import/database/<br/>Database layer]
-    end
-
-    subgraph "Batch Sizes"
-        BS1[Wikidata: 50 IDs]
-        BS2[Database: 1000 records]
-    end
-
-    subgraph "Delays"
-        D1[Wikidata: 100ms]
-        D2[Retry: 1s, 2s, 4s]
-    end
-
-    CMD1 --> ENV1
-    CMD1 --> ENV2
-
-```
-
 ## Summary
 
-The import system is a **four-stage pipeline** that:
+The import system is a **six-stage pipeline** that:
 
 1. **Fetches** administrative boundaries from OpenStreetMap via Overpass API
-2. **Enriches** them with Wikimedia Commons categories via Wikidata
-3. **Transforms and validates** data for database insertion
-4. **Persists** to PostgreSQL with PostGIS spatial extension
+2. **Extracts** Wikidata IDs from OSM data tags
+3. **Enriches** them with Wikimedia Commons categories via Wikidata
+4. **Transforms and validates** data for database insertion
+5. **Persists** to PostgreSQL with PostGIS spatial extension
+6. **Verifies** import results with summary statistics
 
 Key characteristics:
 - ✅ **Effect TS** for error-safe operations

@@ -114,41 +114,6 @@ graph TD
 
 ## Module Responsibilities
 
-### Core Modules
-
-```mermaid
-mindmap
-  root((Import System))
-    Configuration
-      Environment Variables
-      Constants
-      Import Types
-    Fetch Layer
-      Overpass API Client
-      Retry Logic
-      Rate Limiting
-      File I/O
-    Enrichment Layer
-      Wikidata API Client
-      Batch Processing
-      Property Extraction
-      Error Recovery
-    Transformation Layer
-      Data Merging
-      Geometry Validation
-      Deduplication
-      Format Conversion
-    Persistence Layer
-      Connection Pooling
-      Transaction Management
-      Batch Insertion
-      Verification Queries
-    Utilities
-      Effect TS Helpers
-      Batch Processor
-      Progress Logging
-```
-
 ### File Structure
 
 ```mermaid
@@ -240,8 +205,8 @@ graph LR
 
 ```mermaid
 erDiagram
-    boundaries ||--o| boundaries : "parent-child"
-    boundaries {
+    admin_boundaries ||--o| admin_boundaries : "parent-child"
+    admin_boundaries {
         int id PK
         varchar wikidata_id UK "Q123 format"
         varchar commons_category "Category:Name"
@@ -251,7 +216,7 @@ erDiagram
         timestamp created_at
     }
 
-    Note over boundaries
+    Note over admin_boundaries
         PostGIS Extension Enabled
         GIST Index on geom
         B-tree Index on wikidata_id
@@ -381,11 +346,12 @@ stateDiagram-v2
 ```mermaid
 graph LR
     A[Start] --> B[Stage 1: Fetch OSM]
-    B --> C[Stage 2: Fetch Wikidata]
-    C --> D[Stage 3: Transform]
-    D --> E[Stage 4: Insert DB]
-    E --> F[Stage 5: Verify]
-    F --> G[End]
+    B --> C[Stage 2: Extract Wikidata IDs]
+    C --> D[Stage 3: Fetch Wikidata]
+    D --> E[Stage 4: Transform]
+    E --> F[Stage 5: Insert DB]
+    F --> G[Stage 6: Verify]
+    G --> H[End]
 
 ```
 
