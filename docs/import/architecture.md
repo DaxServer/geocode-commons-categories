@@ -194,11 +194,11 @@ graph TD
     VALIDATE -->|Missing| ERROR[Error: Required vars missing]
     VALIDATE -->|Present| PARSE[Parse Types]
 
-    PARSE --> COUNTRY[COUNTRY_CODE: string]
-    PARSE --> LEVELS[ADMIN_LEVELS: number[]]
-    PARSE --> BATCH[BATCH_SIZE: number]
-    PARSE --> OUTPUT[OUTPUT_DIR: string]
-    PARSE --> SKIP[SKIP_WIKIDATA: boolean]
+    PARSE --> COUNTRY["COUNTRY_CODE: string"]
+    PARSE --> LEVELS["ADMIN_LEVELS: array"]
+    PARSE --> BATCH["BATCH_SIZE: number"]
+    PARSE --> OUTPUT["OUTPUT_DIR: string"]
+    PARSE --> SKIP["SKIP_WIKIDATA: boolean"]
 
     COUNTRY --> CONFIG[ImportConfig]
     LEVELS --> CONFIG

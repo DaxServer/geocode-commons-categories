@@ -13,8 +13,8 @@ graph TB
         A4 -->|Yes| A5[Exponential Backoff]
         A5 --> A3
         A4 -->|No| A6[Parse JSON Response]
-        A6 --> A7[Convert to OSMBoundary[]]
-        A7 --> A8[Save to output/osm-{country}.json]
+        A6 --> A7["Convert to OSMBoundary array"]
+        A7 --> A8["Save to output/osm-country.json"]
     end
 
     subgraph "Stage 2: Extract & Enrich"
@@ -183,19 +183,17 @@ sequenceDiagram
         alt Error detected
             Retry->>Retry: Calculate exponential backoff
             Retry->>Retry: Wait (1s, 2s, 4s...)
-        else Success
-            Retry-->>Fetch: Parsed data
-            break Exit retry loop
-            break
         end
     end
+
+    Retry-->>Fetch: Parsed data
     deactivate Retry
 
     Fetch->>Fetch: Convert to OSMBoundary[]
     Note over Fetch: Extract wikidata, name,<br/>admin_level, geometry
 
     alt OUTPUT_DIR configured
-        Fetch->>File: Write osm-{country}.json
+        Fetch->>File: Write osm-country.json file
         File-->>Fetch: Confirmation
     end
 
@@ -224,7 +222,7 @@ sequenceDiagram
 
     loop For each batch
         Batch->>Batch: Build API request
-        Note over Batch: action=wbgetentities<br/>ids=Q1|Q2|...|Q50<br/>props=claims
+        Note over Batch: wbgetentities<br/>50 IDs per request<br/>props=claims
 
         Batch->>API: GET /w/api.php
         activate API

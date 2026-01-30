@@ -20,7 +20,7 @@ graph TB
     end
 
     subgraph "💾 Storage"
-        CACHE[File Cache<br/>osm-{country}.json]
+        CACHE["File Cache<br/>osm-country.json"]
         POSTGRES[(PostgreSQL<br/>PostGIS Extension)]
     end
 

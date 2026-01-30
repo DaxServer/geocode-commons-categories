@@ -165,7 +165,7 @@ graph TB
     end
 
     subgraph "Retry Formula"
-        FORMULA[delay = BASE_DELAY_MS × EXPONENTIAL_BASE^(attempt-1)]
+        FORMULA["delay = BASE × EXP_BASE(attempt-1)"]
     end
 
     subgraph "Example Delays"
@@ -264,29 +264,20 @@ sequenceDiagram
         Func-->>Retry: Result or Error
         deactivate Func
 
-        alt Success
-            Retry-->>Caller: Success result
-            break Exit loop
-            break
-        else Error
+        alt Error
             Retry->>Retry: Check if retryable
             alt Not retryable
                 Retry-->>Caller: Throw error
-                break Exit loop
-                break
-            else Retryable
-                Retry->>Retry: Check attempt count
-                alt attempt >= 3
-                    Retry-->>Caller: Throw error (max retries)
-                    break Exit loop
-                    break
-                else attempt < 3
-                    Retry->>Retry: Calculate delay
-                    Retry->>Retry: Wait (1000, 2000, 4000ms)
-                    Retry->>Retry: increment attempt
-                end
+            else Retryable and attempt < 3
+                Retry->>Retry: Calculate delay
+                Retry->>Retry: Wait (1000, 2000, 4000ms)
+                Retry->>Retry: increment attempt
             end
         end
+    end
+
+    alt Success after retries
+        Retry-->>Caller: Success result
     end
     deactivate Retry
 ```

@@ -110,7 +110,7 @@ sequenceDiagram
     Builder->>Builder: Add [timeout:25]
     Builder->>Builder: Add area filter for country
     Builder->>Builder: Add relation filters
-    Builder->>Builder: Add ["admin_level"~"4|6|8"]
+    Builder->>Builder: Add admin_level filter (4, 6, 8)
     Builder->>Builder: Add ["wikidata"] tag requirement
     Builder->>Builder: Add [out geom]
 
@@ -276,7 +276,7 @@ graph LR
 
     subgraph "Parameters"
         P1[action=wbgetentities]
-        P2[ids=Q1|Q2|...|Q50]
+        P2["ids: Q1 to Q50"]
         P3[props=claims]
         P4[format=json]
     end
@@ -341,7 +341,7 @@ sequenceDiagram
     Batch->>Batch: Split 250 IDs into 5 batches
 
     loop For each batch of 50 IDs
-        Batch->>API: GET /w/api.php?action=wbgetentities&ids=Q1|Q2|...|Q50&props=claims&format=json
+        Batch->>API: GET wbgetentities with 50 IDs
         activate API
 
         API->>API: Lookup entities
@@ -437,32 +437,6 @@ graph TD
 
 ```
 
-### Rate Limiting
-
-```mermaid
-graph LR
-    subgraph "Wikidata API Limits"
-        L1[No official documented limit]
-        L2[Server recommends batch requests]
-        L3[50 IDs per request recommended]
-    end
-
-    subgraph "Client Strategy"
-        S1[50 IDs per request]
-        S2[100ms delay between batches]
-        S3[Graceful error handling]
-    end
-
-    L1 --> S1
-    L2 --> S2
-    L3 --> S3
-
-    S1 --> BATCHES[Multiple batches]
-    S2 --> DELAYS[Wait between requests]
-    S3 --> NO_FAIL[Continue on errors]
-
-```
-
 ### Error Handling
 
 ```mermaid
@@ -550,49 +524,4 @@ graph TB
     W4 --> C3
     W4 --> C4
 
-```
-
-## Best Practices
-
-### Overpass API
-
-```mermaid
-mindmap
-  root((Overpass API<br/>Best Practices))
-    Query Design
-      Use specific area filters
-      Limit admin levels
-      Request only needed tags
-      Include [out geom]
-    Performance
-      Set timeout to 25s
-      Use bounding boxes when possible
-      Avoid complex queries
-    Error Handling
-      Retry with exponential backoff
-      Handle 429 responses
-      Validate JSON structure
-      Log partial failures
-```
-
-### Wikidata API
-
-```mermaid
-mindmap
-  root((Wikidata API<br/>Best Practices))
-    Batch Processing
-      Use 50 IDs per batch
-      Wait 100ms between batches
-      Process in sequence
-      Track progress
-    Error Handling
-      Continue on missing entities
-      Log gracefully
-      Validate P373 property
-      Handle network errors
-    Data Quality
-      Validate category format
-      Handle special characters
-      Check for empty values
-      Store clean strings
 ```
