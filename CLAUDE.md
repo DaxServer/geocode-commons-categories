@@ -162,6 +162,9 @@ export class DatabaseError extends Error {
 ### Import Architecture
 
 - **OSM data**: Fetched via Overpass API with wikidata tags already present
+  - Uses `out bb;` query format to get bounding boxes (minlat, minlon, maxlat, maxlon)
+  - Converts bounding boxes to GeoJSON Polygon (4 corner points)
+  - **Known limitation**: Bounding boxes are approximations, may overlap at borders
 - **Wikidata data**: Uses Wikidata REST API (`wbgetentities` action) - simpler than SPARQL
 - **Batch processing**: Up to 50 IDs per request with 100ms rate limiting
 - **Error resilience**: Continues processing even with partial failures
@@ -189,6 +192,33 @@ src/scripts/
 - `ADMIN_LEVELS` - Comma-separated admin levels (default: "4,6,8")
 - `BATCH_SIZE` - Wikidata API batch size (default: 50)
 - `RATE_LIMIT_MS` - Delay between batches (default: 100)
+- `OUTPUT_DIR` - Optional intermediate file output (code handles null safely)
+- `DATABASE_URL` - PostgreSQL connection string (required for database operations)
+
+## Import System Gotchas
+
+### Wikidata ID Format
+**CRITICAL**: Always preserve "Q" prefix in Wikidata IDs (e.g., "Q240" not "240")
+- OSM tags: `wikidata="Q240"` - extract as-is (only strip URL prefix)
+- Wikidata API: Query with "Q240" - receives category data
+- Database: Store as "Q240" - used for lookups
+- Bug pattern: `.replace('Q', '')` breaks the entire pipeline
+
+### Overpass API Query Format
+Use `out bb;` for bounding boxes (fast, simple rectangles)
+- Alternative `out geom;` doesn't return geometry for relations
+- Alternative `out body; >; out skel qt;` times out for complex countries (too much data)
+- Trade-off: Bounding boxes may overlap at borders, causing inaccurate matches
+
+### API Endpoint
+Reverse geocoding endpoint is `/geocode?lat={lat}&lon={lon}`, not root path
+- Correct: `curl "http://localhost:3000/geocode?lat=50.85&lon=4.35"`
+- Incorrect: `curl "http://localhost:3000/?lat=50.85&lon=4.35"` (returns 404)
+
+### Docker Workflow After Import
+After running `bun import:data`, restart the app container to refresh database connection pool
+- Connection pool initializes before import completes
+- `docker compose restart app` fixes "Location not found" errors post-import
 
 ## Runtime Environment
 

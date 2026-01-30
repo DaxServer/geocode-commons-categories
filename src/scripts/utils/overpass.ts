@@ -25,71 +25,115 @@ function buildBoundaryQuery(countryCode?: string, adminLevels?: number[]): strin
   }
 
   // Query for relations with boundary tags and admin_level
+  // Use "out bb;" to get bounding boxes for relations
   const query = `
     [out:json][timeout:90];
     ${areaFilter}
     (
       relation["boundary"="administrative"]${levelFilter}${countryCode ? '(area.searchArea)' : ''};
     );
-    out geom;
+    out bb;
   `
 
   return query
 }
 
 /**
+ * Type guards for Overpass elements
+ */
+function isRelation(element: { type: string }): element is {
+  type: 'relation'
+  id: number
+  tags?: Record<string, string>
+  bounds?: {
+    minlat: number
+    minlon: number
+    maxlat: number
+    maxlon: number
+  }
+} {
+  return element.type === 'relation'
+}
+
+/**
+ * Convert bounding box to GeoJSON Polygon coordinates
+ */
+function boundsToPolygon(bounds: {
+  minlat: number
+  minlon: number
+  maxlat: number
+  maxlon: number
+}): number[][] {
+  // Create a rectangular polygon from the bounding box
+  const { minlat, minlon, maxlat, maxlon } = bounds
+  return [
+    [minlon, minlat],
+    [maxlon, minlat],
+    [maxlon, maxlat],
+    [minlon, maxlat],
+    [minlon, minlat], // Close the ring
+  ]
+}
+
+/**
  * Convert Overpass response elements to GeoJSON features
+ *
+ * Uses bounding boxes from relation metadata to create simplified polygons
  */
 function convertToGeoJSON(elements: OverpassResponse['elements']): OverpassFeature[] {
   const features: OverpassFeature[] = []
 
-  for (const element of elements) {
-    if (element.type !== 'relation' || !element.tags || !element.geometry) {
+  console.log(`Converting ${elements.length} elements to GeoJSON`)
+
+  const relations = elements.filter(isRelation)
+  console.log(`Found ${relations.length} relations`)
+
+  let skippedNoBounds = 0
+  let skippedNoName = 0
+  let successful = 0
+
+  for (const relation of relations) {
+    if (!relation.tags) {
+      skippedNoName++
       continue
     }
 
-    const name = element.tags['name']
-    const adminLevel = element.tags['admin_level']
+    const name = relation.tags['name']
+    const adminLevel = relation.tags['admin_level']
     if (!name || !adminLevel) {
+      if (!name) skippedNoName++
       continue
     }
 
-    // Convert geometry array to GeoJSON Polygon
-    // Overpass returns simplified geometry, we need to build proper rings
-    const coordinates: number[][][] = []
-    const currentRing: number[][] = []
-
-    for (const point of element.geometry) {
-      currentRing.push([point.lon, point.lat])
-    }
-
-    // A valid polygon ring must have at least 4 points (closed ring)
-    if (currentRing.length < 4) {
-      console.warn(
-        `Skipping element ${element.id}: insufficient geometry points (${currentRing.length})`,
-      )
+    // Use bounding box to create a simplified polygon
+    if (!relation.bounds) {
+      skippedNoBounds++
       continue
     }
 
-    coordinates.push(currentRing)
-
-    const wikidata = element.tags['wikidata']
+    const coordinates = boundsToPolygon(relation.bounds)
+    const wikidata = relation.tags['wikidata']
 
     features.push({
       type: 'Feature',
-      id: element.id,
+      id: relation.id,
       properties: {
         name,
         admin_level: adminLevel,
         wikidata,
-        ...element.tags,
+        ...relation.tags,
       },
       geometry: {
         type: 'Polygon',
-        coordinates,
+        coordinates: [coordinates],
       },
     })
+    successful++
   }
+
+  console.log(
+    `Conversion stats: ${successful} successful, ${skippedNoBounds} no bounds, ${skippedNoName} no name`,
+  )
 
   return features
 }
@@ -154,6 +198,7 @@ export const fetchBoundaries = (
   return Effect.gen(function* () {
     const query = buildBoundaryQuery(countryCode, adminLevels)
     console.log(`Fetching boundaries${countryCode ? ` for ${countryCode}` : ' globally'}...`)
+    console.log(`Query: ${query}`)
 
     const data = yield* fetchWithRetry(query)
 
@@ -163,7 +208,7 @@ export const fetchBoundaries = (
     }
 
     const features = convertToGeoJSON(data.elements)
-    console.log(`Found ${features.length} boundaries`)
+    console.log(`Found ${features.length} boundaries (from ${data.elements.length} elements)`)
 
     return features.map((feature) => ({
       osmId: feature.id,

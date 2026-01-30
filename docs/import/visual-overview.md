@@ -341,6 +341,7 @@ Key characteristics:
 - ✅ **Transaction safety** - atomic batch commits
 - ✅ **Data validation** - geometry checks, deduplication
 - ✅ **Progress tracking** - detailed logging and statistics
+- ⚠️ **Bounding box geometry** - uses simplified rectangles for performance (see [Known Limitations](./README.md#known-limitations))
 
 For detailed information, see:
 - [Architecture](./architecture.md) - System design and components

@@ -270,7 +270,8 @@ classDiagram
         +string wikidata
         +string name
         +number admin_level
-        +GeoJSONGeometry geometry
+        +GeoJSONPolygon geometry
+        +Note: "Bounding box approximation"
         +GeoJSONProperties tags
     }
 
