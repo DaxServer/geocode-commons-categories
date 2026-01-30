@@ -35,7 +35,9 @@ function displayConfig(config: ImportConfig): void {
 
 function setupOutputDirectory(config: ImportConfig): Effect.Effect<void, Error, never> {
   return Effect.gen(function* () {
-    yield* tryAsync(async () => await mkdir(config.outputDir, { recursive: true }))
+    if (config.outputDir) {
+      yield* tryAsync(async () => await mkdir(config.outputDir, { recursive: true }))
+    }
   })
 }
 
@@ -43,7 +45,7 @@ function extractWikidataIds(boundaries: OSMBoundary[]): string[] {
   return boundaries
     .map((b) => b.tags?.['wikidata'])
     .filter((id): id is string => id !== undefined)
-    .map((id) => id.replace('http://www.wikidata.org/entity/', '').replace('Q', ''))
+    .map((id) => id.replace('http://www.wikidata.org/entity/', ''))
 }
 
 function fetchWikidataCategoriesIfNeeded(
@@ -76,6 +78,10 @@ function saveTransformedData(
   config: ImportConfig,
 ): Effect.Effect<void, Error, never> {
   return Effect.gen(function* () {
+    if (!config.outputDir) {
+      console.log('Skipping save (no output directory configured)')
+      return
+    }
     const filename = config.countryCode || 'global'
     const outputPath = join(config.outputDir, `transformed-${filename}.json`)
     yield* tryAsync(

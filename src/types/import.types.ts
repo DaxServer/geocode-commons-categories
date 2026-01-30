@@ -52,13 +52,30 @@ export type OverpassResponse = {
     timestamp_areas_base: string
     copyright: string
   }
-  elements: Array<{
-    type: 'relation' | 'way' | 'node'
-    id: number
-    tags?: Record<string, string>
-    members?: Array<{ type: string; ref: number; role: string }>
-    geometry?: Array<{ lat: number; lon: number }>
-  }>
+  elements: Array<
+    | {
+        type: 'relation'
+        id: number
+        tags?: Record<string, string>
+        bounds?: {
+          minlat: number
+          minlon: number
+          maxlat: number
+          maxlon: number
+        }
+      }
+    | {
+        type: 'way'
+        id: number
+        nodes?: Array<{ ref: number }>
+      }
+    | {
+        type: 'node'
+        id: number
+        lat: number
+        lon: number
+      }
+  >
 }
 
 /**

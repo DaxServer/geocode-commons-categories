@@ -12,6 +12,7 @@ The import system is a multi-stage pipeline that:
 
 ## Documentation Structure
 
+- **[Import Guide](./IMPORT_GUIDE.md)** - Complete walkthrough of the import process with examples and troubleshooting
 - **[Architecture](./architecture.md)** - High-level system architecture, component relationships, and configuration
 - **[Data Flow](./data-flow.md)** - Complete data flow diagrams, sequence diagrams, and state transitions
 - **[API Interactions](./api-interactions.md)** - External API integration details (Overpass, Wikidata)
@@ -23,9 +24,13 @@ The import system is a multi-stage pipeline that:
 # Set required environment variables
 export COUNTRY_CODE="US"
 export ADMIN_LEVELS="4,6,8"
+export DATABASE_URL="postgresql://user:pass@localhost:5432/dbname"
 
 # Run the full import pipeline
 bun import:data
+
+# Test the API (note: endpoint is /geocode, not /)
+curl "http://localhost:3000/geocode?lat=40.7128&lon=-74.0060" | jq .
 
 # Or run individual stages
 bun import:osm        # Fetch OSM data only
@@ -82,10 +87,35 @@ graph LR
 
 The import system validates:
 - ✅ All boundaries have valid geometries (PostGIS `ST_IsValid`)
-- ✅ Wikidata IDs are properly formatted (Q\d+)
+- ✅ Wikidata IDs are properly formatted with "Q" prefix (Q\d+)
 - ✅ Commons categories are extracted from P373 property
 - ✅ No duplicate wikidata_id entries
 - ✅ admin_level values are within expected range
+- ⚠️ **Geometries use bounding box approximation** - see [Known Limitations](#known-limitations) below
+
+## Known Limitations
+
+### Bounding Box Geometry
+
+The current implementation uses **bounding box rectangles** instead of full administrative boundary polygons. This is a trade-off between query complexity and accuracy:
+
+**Impact:**
+- ⚠️ Point-in-polygon queries may be inaccurate for:
+  - Border regions where bounding boxes overlap
+  - Coastal areas with irregular boundaries
+  - Municipalities with complex shapes
+- ✅ Benefits:
+  - Faster Overpass API queries (no timeout issues)
+  - Smaller response size
+  - Simpler geometry processing
+
+**Example Issue:**
+A coordinate in Ghent, Belgium might incorrectly match a French region if their bounding boxes overlap.
+
+**Future Improvements:**
+- Implement full polygon geometry processing with `out body; >;` queries
+- Add geometry simplification to reduce complexity
+- Use alternative data sources with pre-built polygons
 
 ## Troubleshooting
 

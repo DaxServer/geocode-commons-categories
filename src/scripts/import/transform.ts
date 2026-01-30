@@ -16,7 +16,7 @@ function polygonToEWKT(polygon: GeoJSON.Polygon): string {
  * Extract Wikidata ID from OSM wikidata tag
  */
 function extractWikidataId(wikidataTag: string): string {
-  return wikidataTag.replace('http://www.wikidata.org/entity/', '').replace('Q', '')
+  return wikidataTag.replace('http://www.wikidata.org/entity/', '')
 }
 
 /**
@@ -50,7 +50,7 @@ export function enrichWithWikidataData(
     }
 
     enriched.push({
-      wikidata_id: `Q${wikidataId}`,
+      wikidata_id: wikidataId,
       commons_category: commonsCategory,
       admin_level: osmBoundary.adminLevel,
       name: osmBoundary.name,

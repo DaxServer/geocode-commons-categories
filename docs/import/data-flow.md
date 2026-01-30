@@ -19,7 +19,7 @@ graph TB
 
     subgraph "Stage 2: Extract Wikidata IDs"
         A8 --> B1[Extract Wikidata IDs from Tags]
-        B1 --> B2[Format IDs<br/>Strip URL and Q prefix]
+        B1 --> B2[Format IDs<br/>Strip URL prefix only<br/>Keep Q prefix]
         B2 --> B3{Has IDs?}
         B3 -->|No| B4[Skip Wikidata Stage]
         B3 -->|Yes| B5[Pass to Stage 3]
@@ -175,7 +175,7 @@ sequenceDiagram
     activate Fetch
 
     Fetch->>Fetch: Build Overpass QL query
-    Note over Fetch: out:json timeout:90<br/>relation admin_level filter<br/>wikidata tag required<br/>out geom
+    Note over Fetch: out:json timeout:90<br/>relation admin_level filter<br/>wikidata tag required<br/>out bb (bounding boxes)
 
     Fetch->>Retry: Execute with retry
     activate Retry
