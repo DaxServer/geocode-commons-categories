@@ -147,7 +147,7 @@ export const runImport = (config: ImportConfig): Effect.Effect<void, Error, neve
 
     if (stats.errors.length > 0) {
       console.log('⚠️  Import completed with errors')
-      process.exit(1)
+      return yield* Effect.fail(new Error('Import completed with errors'))
     } else {
       console.log('✅ Import completed successfully!')
 
