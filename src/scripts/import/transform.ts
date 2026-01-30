@@ -1,7 +1,4 @@
-/**
- * Transform OSM and Wikidata data into database-ready format
- */
-
+import { pipe } from 'effect'
 import type { AdminBoundaryImport, OSMBoundary } from '../../types/import.types'
 
 /**
@@ -130,9 +127,10 @@ export function transformBoundaries(
   osmBoundaries: OSMBoundary[],
   wikidataCategories: Map<string, string>,
 ): AdminBoundaryImport[] {
-  let enriched = enrichWithWikidataData(osmBoundaries, wikidataCategories)
-  enriched = validateGeometries(enriched)
-  enriched = deduplicateBoundaries(enriched)
-
-  return enriched
+  return pipe(
+    osmBoundaries,
+    (boundaries) => enrichWithWikidataData(boundaries, wikidataCategories),
+    validateGeometries,
+    deduplicateBoundaries,
+  )
 }

@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { Elysia, t } from 'elysia'
 import { config } from './config/env'
 import { reverseGeocode } from './services/geocode.service'
@@ -7,13 +8,7 @@ import { coordinateSchema, geocodeResponseSchema } from './types/geocode.types'
 new Elysia()
   .get(
     '/geocode',
-    async ({ query }) => {
-      const result = await reverseGeocode(query.lat, query.lon)
-      if (!result) {
-        throw new NotFoundError('Location not found')
-      }
-      return result
-    },
+    async ({ query }) => await Effect.runPromise(reverseGeocode(query.lat, query.lon)),
     {
       query: coordinateSchema,
       response: geocodeResponseSchema,
@@ -25,7 +20,9 @@ new Elysia()
       const results = []
 
       for (const coords of body) {
-        const result = await reverseGeocode(coords.lat, coords.lon)
+        const result = await Effect.runPromise(
+          Effect.catchAll(() => Effect.succeed(null))(reverseGeocode(coords.lat, coords.lon)),
+        )
         if (result) {
           results.push(result)
         }

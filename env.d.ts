@@ -10,6 +10,5 @@ declare module 'bun' {
     SKIP_WIKIDATA: string
     OUTPUT_DIR: string
     INPUT_FILE: string
-    VALIDATE_COMMONS: string
   }
 }

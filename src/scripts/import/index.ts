@@ -4,93 +4,128 @@
 
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { ImportConfig } from '../../types/import.types'
+import { Effect } from 'effect'
+import type {
+  AdminBoundaryImport,
+  ImportConfig,
+  ImportStats,
+  OSMBoundary,
+} from '../../types/import.types'
+import { tryAsync } from '../utils/effect'
+import { logSection } from '../utils/logging'
 import { fetchWikimediaCategoriesBatch } from '../utils/wikidata-api'
-import { batchValidateCommonsCategories } from '../utils/wikimedia-commons-api'
-import { batchInsertBoundaries, closePool, verifyImport } from './database'
+import { batchInsertBoundaries } from './database'
+import { closePool } from './database/connection'
+import { verifyImport } from './database/verification'
 import { fetchOSMData } from './fetch-osm'
 import { transformBoundaries } from './transform'
 
-/**
- * Run the complete import pipeline
- */
-export async function runImport(config: ImportConfig): Promise<void> {
-  const { countryCode, skipWikidata, outputDir } = config
-
+function displayConfig(config: ImportConfig): void {
   console.log('╔════════════════════════════════════════════════════════════╗')
   console.log('║   Administrative Boundary Data Import System            ║')
   console.log('╚════════════════════════════════════════════════════════════╝')
   console.log()
-  console.log(`Configuration:`)
-  console.log(`  Country: ${countryCode || 'Global (not yet supported)'}`)
-  console.log(`  Admin levels: ${config.adminLevels?.join(', ') || 'All'}`)
-  console.log(`  Batch size: ${config.batchSize || 1000}`)
-  console.log(`  Skip Wikidata: ${skipWikidata ? 'Yes' : 'No'}`)
+  console.log('Configuration:')
+  console.log(`  Country: ${config.countryCode}`)
+  console.log(`  Admin levels: ${config.adminLevels.join(', ')}`)
+  console.log(`  Batch size: ${config.batchSize}`)
+  console.log(`  Skip Wikidata: ${config.skipWikidata ? 'Yes' : 'No'}`)
   console.log()
+}
 
-  // Create output directory if specified
-  if (outputDir) {
-    await mkdir(outputDir, { recursive: true })
-  }
+function setupOutputDirectory(config: ImportConfig): Effect.Effect<void, Error, never> {
+  return Effect.gen(function* () {
+    yield* tryAsync(async () => await mkdir(config.outputDir, { recursive: true }))
+  })
+}
 
-  try {
-    // Step 1: Fetch OSM data
-    console.log('\n▶ Step 1: Fetching OSM boundary data')
-    console.log('━'.repeat(60))
-    const osmBoundaries = await fetchOSMData(config)
+function extractWikidataIds(boundaries: OSMBoundary[]): string[] {
+  return boundaries
+    .map((b) => b.tags?.['wikidata'])
+    .filter((id): id is string => id !== undefined)
+    .map((id) => id.replace('http://www.wikidata.org/entity/', '').replace('Q', ''))
+}
+
+function fetchWikidataCategoriesIfNeeded(
+  boundaries: OSMBoundary[],
+  skip: boolean,
+): Effect.Effect<Map<string, string>, Error, never> {
+  return Effect.gen(function* () {
+    if (skip) {
+      return new Map()
+    }
+
+    logSection('Step 2: Extracting Wikidata IDs from OSM data')
+
+    const wikidataIds = extractWikidataIds(boundaries)
+    console.log(`Found ${wikidataIds.length} unique Wikidata IDs in OSM data`)
+
+    logSection('Step 3: Fetching Commons categories from Wikidata')
+    const categories = yield* fetchWikimediaCategoriesBatch(wikidataIds)
+
+    if (categories.size === 0) {
+      console.warn('No Commons categories fetched. Continuing without Wikidata data.')
+    }
+
+    return categories
+  })
+}
+
+function saveTransformedData(
+  boundaries: AdminBoundaryImport[],
+  config: ImportConfig,
+): Effect.Effect<void, Error, never> {
+  return Effect.gen(function* () {
+    const filename = config.countryCode || 'global'
+    const outputPath = join(config.outputDir, `transformed-${filename}.json`)
+    yield* tryAsync(
+      async () => await Bun.write(outputPath, JSON.stringify(boundaries, null, 2)),
+      'Failed to write transformed data',
+    )
+    console.log(`Saved transformed data to ${outputPath}`)
+  })
+}
+
+function displaySummary(
+  stats: ImportStats,
+  osmCount: number,
+  wikidataCount: number,
+  transformedCount: number,
+): void {
+  console.log()
+  console.log('╔════════════════════════════════════════════════════════════╗')
+  console.log('║                      Import Summary                        ║')
+  console.log('╚════════════════════════════════════════════════════════════╝')
+  console.log(`OSM boundaries fetched:    ${osmCount}`)
+  console.log(`Wikidata IDs found:       ${wikidataCount}`)
+  console.log(`Matched records:          ${transformedCount}`)
+  console.log(`Successfully inserted:     ${stats.insertedRecords}`)
+  console.log(`Errors:                   ${stats.errors.length}`)
+  console.log()
+}
+
+/**
+ * Run the complete import pipeline
+ */
+export const runImport = (config: ImportConfig): Effect.Effect<void, Error, never> => {
+  return Effect.gen(function* () {
+    displayConfig(config)
+    yield* setupOutputDirectory(config)
+
+    logSection('Step 1: Fetching OSM boundary data')
+    const osmBoundaries = yield* fetchOSMData(config)
 
     if (osmBoundaries.length === 0) {
       console.error('No OSM boundaries fetched. Aborting import.')
       return
     }
 
-    // Step 2: Extract Wikidata IDs and fetch Commons categories
-    let wikidataCategories: Map<string, string> = new Map()
-    if (!skipWikidata) {
-      console.log('\n▶ Step 2: Extracting Wikidata IDs from OSM data')
-      console.log('━'.repeat(60))
+    const wikidataCategories = yield* fetchWikidataCategoriesIfNeeded(
+      osmBoundaries,
+      config.skipWikidata,
+    )
 
-      const wikidataIds = osmBoundaries
-        .map((b) => b.tags?.['wikidata'])
-        .filter((id): id is string => id !== undefined)
-        .map((id) => id.replace('http://www.wikidata.org/entity/', '').replace('Q', ''))
-
-      console.log(`Found ${wikidataIds.length} unique Wikidata IDs in OSM data`)
-
-      console.log('\n▶ Step 3: Fetching Commons categories from Wikidata')
-      console.log('━'.repeat(60))
-      wikidataCategories = await fetchWikimediaCategoriesBatch(wikidataIds)
-
-      if (wikidataCategories.size === 0) {
-        console.warn('No Commons categories fetched. Continuing without Wikidata data.')
-      }
-    }
-
-    // Step 4: Optionally validate Commons categories
-    if (Bun.env.VALIDATE_COMMONS === 'true' && wikidataCategories.size > 0) {
-      console.log('\n▶ Step 4: Validating Commons categories')
-      console.log('━'.repeat(60))
-      const categories = Array.from(wikidataCategories.values())
-      const validCategories = await batchValidateCommonsCategories(categories)
-
-      // Filter out invalid categories
-      const filteredCategories = new Map<string, string>()
-      for (const [wikidataId, category] of wikidataCategories.entries()) {
-        if (validCategories.has(category)) {
-          filteredCategories.set(wikidataId, category)
-        }
-      }
-
-      console.log(
-        `Validated: ${filteredCategories.size}/${wikidataCategories.size} categories exist`,
-      )
-      wikidataCategories = filteredCategories
-    }
-
-    // Step 5: Transform and enrich data
-    console.log('\n▶ Step 5: Transforming and enriching data')
-    console.log('━'.repeat(60))
-
+    logSection('Step 4: Transforming and enriching data')
     const transformedBoundaries = transformBoundaries(osmBoundaries, wikidataCategories)
 
     if (transformedBoundaries.length === 0) {
@@ -98,75 +133,58 @@ export async function runImport(config: ImportConfig): Promise<void> {
       return
     }
 
-    // Save transformed data for debugging
-    if (outputDir) {
-      const filename = countryCode || 'global'
-      const outputPath = join(outputDir, `transformed-${filename}.json`)
-      await Bun.write(outputPath, JSON.stringify(transformedBoundaries, null, 2))
-      console.log(`Saved transformed data to ${outputPath}`)
-    }
+    yield* saveTransformedData(transformedBoundaries, config)
 
-    // Step 6: Insert into database
-    console.log('\n▶ Step 6: Inserting data into database')
-    console.log('━'.repeat(60))
-    const stats = await batchInsertBoundaries(transformedBoundaries, config.batchSize)
+    logSection('Step 5: Inserting data into database')
+    const stats = yield* batchInsertBoundaries(transformedBoundaries, config.batchSize)
 
-    // Step 7: Verification
-    if (stats.errors.length === 0) {
-      console.log('\n▶ Step 7: Verifying import')
-      console.log('━'.repeat(60))
-      await verifyImport()
-    }
-
-    // Summary
-    console.log('\n╔════════════════════════════════════════════════════════════╗')
-    console.log('║                      Import Summary                        ║')
-    console.log('╚════════════════════════════════════════════════════════════╝')
-    console.log(`OSM boundaries fetched:    ${osmBoundaries.length}`)
-    console.log(`Wikidata IDs found:       ${wikidataCategories.size}`)
-    console.log(`Matched records:          ${transformedBoundaries.length}`)
-    console.log(`Successfully inserted:     ${stats.insertedRecords}`)
-    console.log(`Errors:                   ${stats.errors.length}`)
-    console.log()
+    displaySummary(
+      stats,
+      osmBoundaries.length,
+      wikidataCategories.size,
+      transformedBoundaries.length,
+    )
 
     if (stats.errors.length > 0) {
       console.log('⚠️  Import completed with errors')
-      process.exit(1)
+      return yield* Effect.fail(new Error('Import completed with errors'))
     } else {
       console.log('✅ Import completed successfully!')
+
+      logSection('Step 6: Verifying import')
+      yield* verifyImport()
     }
-  } catch (error) {
-    console.error('\n❌ Import failed:', error)
-    process.exit(1)
-  } finally {
-    await closePool()
-  }
+  })
+}
+
+export const runImportWithCleanup = (config: ImportConfig): Effect.Effect<void, Error> => {
+  return runImport(config).pipe(
+    Effect.ensuring(
+      Effect.catchAll((error) => Effect.sync(() => console.error('Failed to close pool:', error)))(
+        closePool(),
+      ),
+    ),
+  )
 }
 
 /**
  * Main function for CLI execution
  */
 export async function main() {
-  // Parse command line arguments and environment variables
   const countryCode = Bun.env.COUNTRY_CODE
   const adminLevelsStr = Bun.env.ADMIN_LEVELS
-  const batchSizeStr = Bun.env.BATCH_SIZE
-  const skipWikidataStr = Bun.env.SKIP_WIKIDATA
-  const outputDir = Bun.env.OUTPUT_DIR
-
   const config: ImportConfig = {
     countryCode,
-    adminLevels:
-      adminLevelsStr
-        ?.split(',')
-        .map((s) => parseInt(s, 10))
-        .filter((n) => !Number.isNaN(n)) || [],
-    batchSize: batchSizeStr ? parseInt(batchSizeStr, 10) : undefined,
-    skipWikidata: skipWikidataStr === 'true',
-    outputDir,
+    adminLevels: adminLevelsStr
+      .split(',')
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !Number.isNaN(n)),
+    batchSize: parseInt(Bun.env.BATCH_SIZE, 10),
+    skipWikidata: Bun.env.SKIP_WIKIDATA === 'true',
+    outputDir: Bun.env.OUTPUT_DIR,
   }
 
-  await runImport(config)
+  await Effect.runPromise(runImportWithCleanup(config))
 }
 
 // Run if executed directly
