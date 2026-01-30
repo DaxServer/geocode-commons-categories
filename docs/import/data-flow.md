@@ -168,7 +168,7 @@ sequenceDiagram
     activate Fetch
 
     Fetch->>Fetch: Build Overpass QL query
-    Note over Fetch: [out:json][timeout:25];<br/>relation["admin_level"~"4|6|8"]["wikidata"];<br/>out geom;
+    Note over Fetch: out:json timeout:25<br/>relation admin_level filter<br/>wikidata tag required<br/>out geom
 
     Fetch->>Retry: Execute with retry
     activate Retry

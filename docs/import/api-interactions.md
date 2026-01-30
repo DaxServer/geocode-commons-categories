@@ -83,11 +83,11 @@ graph TD
 ```mermaid
 graph LR
     subgraph "Overpass QL Query"
-        Q1[out:json]
-        Q2[timeout:25]
-        Q3[area["ISO3166-1"="US"]->.searchArea;]
-        Q4[relation["admin_level"~"4|6|8"]["wikidata"](area.searchArea);]
-        Q5[out geom;]
+        Q1["out:json"]
+        Q2["timeout:25"]
+        Q3["area ISO3166-1 US"]
+        Q4["relation admin_level 4/6/8"]
+        Q5["out geom"]
     end
 
     Q1 --> Q2 --> Q3 --> Q4 --> Q5

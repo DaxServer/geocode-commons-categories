@@ -238,7 +238,7 @@ graph LR
 
 ### Schema Design
 
-```mermaidermaid
+```mermaid
 erDiagram
     boundaries ||--o| boundaries : "parent-child"
     boundaries {
