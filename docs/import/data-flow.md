@@ -75,8 +75,6 @@ graph TB
         E5 --> E6[Import Complete]
     end
 
-    style A1 fill:#e1f5ff
-    style E6 fill:#e1ffe1
 ```
 
 ## Sequence Diagrams
@@ -542,9 +540,6 @@ graph LR
     VALID -->|Convert EWKT| IMPORT
     IMPORT -->|INSERT| ROW
 
-    style OSM fill:#ffe1e1
-    style IMPORT fill:#e1ffe1
-    style ROW fill:#e1f5ff
 ```
 
 ### Data Enrichment Flow
@@ -597,8 +592,6 @@ graph TD
     V2 --> OUT2
     V3 --> OUT3
 
-    style OSM1 fill:#ffe1e1
-    style OUT1 fill:#e1ffe1
 ```
 
 ## Filter and Decision Flows
@@ -633,11 +626,6 @@ graph TD
 
     SUCCESS --> IMPORT[Add to import batch]
 
-    style SUCCESS fill:#e1ffe1
-    style SKIP1 fill:#ffe1e1
-    style SKIP2 fill:#ffe1e1
-    style SKIP3 fill:#ffe1e1
-    style SKIP4 fill:#ffe1e1
 ```
 
 ### Batch Processing Flow
@@ -673,6 +661,4 @@ graph TD
     COMPLETE_WD --> END[End]
     COMPLETE_DB --> END
 
-    style BATCH_WD fill:#ffe1f0
-    style BATCH_DB fill:#e1f5ff
 ```

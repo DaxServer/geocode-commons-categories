@@ -40,9 +40,6 @@ graph TB
     EFFECT --> CATCH
     EFFECT --> RECOVER
 
-    style EFFECT fill:#e1f5ff
-    style RETRY fill:#fff4e1
-    style SKIP fill:#fff4e1
 ```
 
 ## Error Taxonomy
@@ -152,11 +149,6 @@ graph TD
     STAGE5 --> E5A[Verification query failed]
     STAGE5 --> E5B[Unexpected counts]
 
-    style STAGE1 fill:#ffe1e1
-    style STAGE2 fill:#fff4e1
-    style STAGE3 fill:#e1f0ff
-    style STAGE4 fill:#e1ffe1
-    style STAGE5 fill:#f0e1ff
 ```
 
 ## Retry Logic
@@ -190,7 +182,6 @@ graph TB
     FORMULA --> D2
     FORMULA --> D3
 
-    style FORMULA fill:#e1f5ff
 ```
 
 ### Retry State Machine
@@ -258,8 +249,6 @@ graph TD
     RETURN --> END[End]
     THROW --> END
 
-    style RETURN fill:#e1ffe1
-    style THROW fill:#ffe1e1
 ```
 
 ### Retry Implementation
@@ -361,9 +350,6 @@ graph TD
 
     HANDLE[Handle Result] --> NEXT[Continue or Fail]
 
-    style RETRY_NET fill:#fff4e1
-    style SKIP_RECORD fill:#e1f5ff
-    style ROLLBACK fill:#ffe1e1
 ```
 
 ### Effect TS Error Handling
@@ -402,10 +388,6 @@ graph TB
 
     OP3 -->|Catch all| R3
 
-    style OP2 fill:#e1f5ff
-    style R1 fill:#fff4e1
-    style R2 fill:#fff4e1
-    style R3 fill:#fff4e1
 ```
 
 ### Example: Database Error Recovery
@@ -490,11 +472,6 @@ graph TD
     FAIL_3 --> END
     FAIL_4 --> END
 
-    style SUCCESS fill:#e1ffe1
-    style FAIL_1 fill:#ffe1e1
-    style FAIL_2 fill:#ffe1e1
-    style FAIL_3 fill:#ffe1e1
-    style FAIL_4 fill:#ffe1e1
 ```
 
 ### Stage 2: Wikidata Errors
@@ -554,9 +531,6 @@ graph TD
 
     CONTINUE --> NEXT_BATCH
 
-    style ADD fill:#e1ffe1
-    style SKIP_ENTITY fill:#fff4e1
-    style SKIP_BATCH fill:#ffe1e1
 ```
 
 ### Stage 3: Transform Errors
@@ -608,11 +582,6 @@ graph TD
 
     REPORT --> END[Return results]
 
-    style ADD fill:#e1ffe1
-    style SKIP_1 fill:#ffe1e1
-    style SKIP_2 fill:#ffe1e1
-    style SKIP_3 fill:#ffe1e1
-    style SKIP_4 fill:#ffe1e1
 ```
 
 ### Stage 4: Database Errors
@@ -668,8 +637,6 @@ graph TD
 
     REPORT --> END[Return results]
 
-    style COMMIT fill:#e1ffe1
-    style ROLLBACK fill:#ffe1e1
 ```
 
 ## Error Logging
@@ -701,9 +668,6 @@ graph TB
     E5 --> INFO
     E6 --> INFO
 
-    style ERROR fill:#ffe1e1
-    style WARN fill:#fff4e1
-    style INFO fill:#e1f5ff
 ```
 
 ### Error Message Format
@@ -730,7 +694,6 @@ graph LR
     COMP5 --> MSG
     COMP6 --> MSG
 
-    style MSG fill:#e1f5ff
 ```
 
 ## Graceful Degradation
@@ -764,8 +727,6 @@ graph TD
 
     IMPORT --> COMPLETE[Import complete]
 
-    style FULL fill:#e1ffe1
-    style DEGRADED fill:#fff4e1
 ```
 
 ### Data Quality on Errors
@@ -791,10 +752,6 @@ graph TB
     E3 --> L3
     E4 --> L3
 
-    style L1 fill:#e1ffe1
-    style L2 fill:#fff4e1
-    style L3 fill:#ffe1e1
-    style L4 fill:#f0e1ff
 ```
 
 ## Error Recovery Summary

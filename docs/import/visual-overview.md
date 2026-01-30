@@ -34,11 +34,6 @@ graph TB
     STAGE4 --> STAGE5
     STAGE5 --> POSTGRES
 
-    style STAGE1 fill:#ffe1e1
-    style STAGE2 fill:#fff4e1
-    style STAGE3 fill:#e1f0ff
-    style STAGE4 fill:#e1ffe1
-    style STAGE5 fill:#f0e1ff
 ```
 
 ## Component Interaction Map
@@ -77,10 +72,6 @@ graph LR
     P1 --> S1
     P4 --> S2
 
-    style C1 fill:#e1f5ff
-    style A1 fill:#ffe1e1
-    style A2 fill:#e1f0ff
-    style S2 fill:#e1ffe1
 ```
 
 ## Data Volume Flow
@@ -103,8 +94,6 @@ graph TD
 
     FINAL --> DB[Database<br/>All records inserted]
 
-    style INPUT fill:#e1f5ff
-    style DB fill:#e1ffe1
 ```
 
 ## Timing Diagram
@@ -161,8 +150,6 @@ graph LR
     CONTINUE -->|Yes| END
     CONTINUE -->|No| FAIL[Fail operation]
 
-    style SUCCESS fill:#e1ffe1
-    style FAIL fill:#ffe1e1
 ```
 
 ## Configuration Matrix
@@ -198,12 +185,6 @@ graph TB
     IMPORT --> I3
     IMPORT --> I4
 
-    style R1 fill:#e1ffe1
-    style R2 fill:#e1ffe1
-    style I1 fill:#e1f5ff
-    style I2 fill:#e1f5ff
-    style I3 fill:#e1f5ff
-    style I4 fill:#e1f5ff
 ```
 
 ## Performance Characteristics
@@ -237,12 +218,6 @@ graph LR
     O3 --> T4
     O4 --> T4
 
-    style B1 fill:#ffe1e1
-    style B2 fill:#ffe1e1
-    style O1 fill:#e1ffe1
-    style O2 fill:#e1ffe1
-    style O3 fill:#e1ffe1
-    style O4 fill:#e1ffe1
 ```
 
 ## Data Quality Metrics
@@ -280,10 +255,6 @@ graph TD
     R3 --> A3
     R4 --> A4
 
-    style R1 fill:#e1ffe1
-    style R2 fill:#e1ffe1
-    style R3 fill:#fff4e1
-    style R4 fill:#e1ffe1
 ```
 
 ## Key Metrics Dashboard
@@ -307,11 +278,6 @@ graph TB
     M5 --> M6
     M6 --> M7
 
-    style M1 fill:#e1f5ff
-    style M3 fill:#fff4e1
-    style M4 fill:#e1f0ff
-    style M6 fill:#e1ffe1
-    style M7 fill:#ffe1e1
 ```
 
 ## Technology Stack
@@ -350,9 +316,6 @@ graph TB
     PG --> POSTGRES
     POSTGRES --> POSTGIS
 
-    style BUN fill:#e1f5ff
-    style EFFECT fill:#ffe1f0
-    style POSTGIS fill:#e1ffe1
 ```
 
 ## Documentation Navigation
@@ -432,9 +395,6 @@ graph TB
     CMD1 --> ENV1
     CMD1 --> ENV2
 
-    style CMD1 fill:#e1f5ff
-    style ENV1 fill:#ffe1e1
-    style ENV2 fill:#ffe1e1
 ```
 
 ## Summary

@@ -20,8 +20,6 @@ graph LR
     IMPORT -->|Fetch boundaries| OVERPASS
     IMPORT -->|Fetch categories| WIKIDATA
 
-    style OVERPASS fill:#ffe1e1
-    style WIKIDATA fill:#e1f0ff
 ```
 
 ## Overpass API Integration
@@ -55,8 +53,6 @@ graph TB
     TIMEOUT --> QL
     QL --> JSON
 
-    style ENDPOINT fill:#e1f5ff
-    style JSON fill:#e1ffe1
 ```
 
 ### Query Construction
@@ -80,7 +76,6 @@ graph TD
 
     OUT_GEOM --> COMPLETE[Complete Query]
 
-    style COMPLETE fill:#e1ffe1
 ```
 
 ### Example Query
@@ -97,11 +92,6 @@ graph LR
 
     Q1 --> Q2 --> Q3 --> Q4 --> Q5
 
-    style Q1 fill:#ffe1e1
-    style Q2 fill:#ffe1e1
-    style Q3 fill:#fff4e1
-    style Q4 fill:#fff4e1
-    style Q5 fill:#e1f5ff
 ```
 
 ### Request Flow
@@ -180,9 +170,6 @@ graph TD
     P1 --> LAT[lat: 48.8566]
     P1 --> LON[lon: 2.3522]
 
-    style ROOT fill:#e1f5ff
-    style WD fill:#e1ffe1
-    style GEOM fill:#ffe1f0
 ```
 
 ### Retry Logic
@@ -224,11 +211,6 @@ graph TD
     FAIL_3 --> END
     FAIL_4 --> END
 
-    style SUCCESS fill:#e1ffe1
-    style FAIL_1 fill:#ffe1e1
-    style FAIL_2 fill:#ffe1e1
-    style FAIL_3 fill:#ffe1e1
-    style FAIL_4 fill:#ffe1e1
 ```
 
 ### Rate Limiting Strategy
@@ -253,9 +235,6 @@ graph LR
 
     S1 --> S3
 
-    style S1 fill:#fff4e1
-    style S2 fill:#fff4e1
-    style S3 fill:#fff4e1
 ```
 
 ## Wikidata REST API Integration
@@ -284,8 +263,6 @@ graph TB
     FORMAT --> PROPS
     PROPS --> P373
 
-    style ENDPOINT fill:#e1f5ff
-    style P373 fill:#e1ffe1
 ```
 
 ### Request Format
@@ -307,8 +284,6 @@ graph LR
     URL --> PARAMS
     PARAMS --> P1 --> P2 --> P3 --> P4
 
-    style URL fill:#e1f5ff
-    style P2 fill:#e1ffe1
 ```
 
 ### Batch Processing Flow
@@ -349,9 +324,6 @@ graph TD
 
     MORE_BATCHES -->|No| COMPLETE[Return category map]
 
-    style STORE fill:#e1ffe1
-    style COMPLETE fill:#e1ffe1
-    style LOG_ERROR fill:#ffe1e1
 ```
 
 ### Request/Response Sequence
@@ -428,9 +400,6 @@ graph TD
     DATAVALUE --> VALUE[value: Category:Paris]
     DATAVALUE --> TYPE[type: string]
 
-    style ROOT fill:#e1f5ff
-    style P373 fill:#e1ffe1
-    style VALUE fill:#fff4e1
 ```
 
 ### Property Extraction
@@ -466,8 +435,6 @@ graph TD
     RETURN --> END[Complete]
     SKIP --> END
 
-    style RETURN fill:#e1ffe1
-    style SKIP fill:#ffe1e1
 ```
 
 ### Rate Limiting
@@ -494,9 +461,6 @@ graph LR
     S2 --> DELAYS[Wait between requests]
     S3 --> NO_FAIL[Continue on errors]
 
-    style S1 fill:#fff4e1
-    style S2 fill:#fff4e1
-    style S3 fill:#fff4e1
 ```
 
 ### Error Handling
@@ -547,9 +511,6 @@ graph TD
     EMPTY --> END
     CONTINUE --> END
 
-    style SUCCESS fill:#e1ffe1
-    style EMPTY fill:#fff4e1
-    style CONTINUE fill:#fff4e1
 ```
 
 ## Integration Comparison
@@ -589,9 +550,6 @@ graph TB
     W4 --> C3
     W4 --> C4
 
-    style O1 fill:#ffe1e1
-    style W1 fill:#e1f0ff
-    style C1 fill:#e1ffe1
 ```
 
 ## Best Practices

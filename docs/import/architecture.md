@@ -110,11 +110,6 @@ graph TD
     E --> E3[Insert Records]
     E --> E4[Verify Results]
 
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#fff4e1
-    style D fill:#fff4e1
-    style E fill:#fff4e1
 ```
 
 ## Module Responsibilities
@@ -187,13 +182,6 @@ graph LR
     DB_DIR --> BATCH
     INDEX --> LOG
 
-    style INDEX fill:#e1f5ff
-    style FETCH fill:#fff4e1
-    style TRANSFORM fill:#fff4e1
-    style DB_DIR fill:#fff4e1
-    style EFFECT fill:#f0f0f0
-    style BATCH fill:#f0f0f0
-    style WD_API fill:#f0f0f0
 ```
 
 ## Configuration Architecture
@@ -220,8 +208,6 @@ graph TD
 
     CONFIG --> ORCH[Orchestrator]
 
-    style CONFIG fill:#e1f5ff
-    style ERROR fill:#ffe1e1
 ```
 
 ### Constants Configuration
@@ -305,7 +291,6 @@ graph TB
 
     POOL -->|Reuse| IMPORT
 
-    style POOL fill:#e1f5ff
 ```
 
 ## Data Models
@@ -400,11 +385,6 @@ graph LR
     E --> F[Stage 5: Verify]
     F --> G[End]
 
-    style B fill:#fff4e1
-    style C fill:#fff4e1
-    style D fill:#fff4e1
-    style E fill:#fff4e1
-    style F fill:#fff4e1
 ```
 
 ### Parallel Batch Processing (Wikidata)
@@ -435,8 +415,6 @@ graph TD
 
     MERGE --> OUTPUT[Category Map]
 
-    style INPUT fill:#e1f5ff
-    style OUTPUT fill:#e1f5ff
 ```
 
 ## Technology Stack
@@ -473,7 +451,4 @@ graph TB
     PG --> POSTGRES_DB
     POSTGRES_DB --> POSTGIS
 
-    style BUN fill:#e1f5ff
-    style EFFECT fill:#ffe1f0
-    style POSTGIS fill:#e1ffe1
 ```
