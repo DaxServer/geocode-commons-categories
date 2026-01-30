@@ -259,6 +259,8 @@ erDiagram
     end Note
 ```
 
+**Note**: PostGIS Extension Enabled, GIST Index on geom, B-tree Index on wikidata_id and admin_level
+
 ### Connection Pool Architecture
 
 ```mermaid

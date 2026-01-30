@@ -112,7 +112,6 @@ gantt
     section Fetch Wikidata
     Extract IDs            :12, 13
     Batch Processing       :13, 50
-    (10 batches × 100ms)   :
     Build Category Map     :50, 52
 
     section Transform
@@ -122,7 +121,6 @@ gantt
 
     section Database
     Batch Insert           :72, 80
-    (10 batches × 1000)    :
     Verification           :80, 82
 ```
 

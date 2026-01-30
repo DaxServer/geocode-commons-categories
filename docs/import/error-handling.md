@@ -48,20 +48,20 @@ graph TB
 
 ```mermaid
 classDiagram
-    Error <-- ImportError
-    Error <-- NetworkError
-    Error <-- ValidationError
-    Error <-- DatabaseError
+    Error <|-- ImportError
+    Error <|-- NetworkError
+    Error <|-- ValidationError
+    Error <|-- DatabaseError
 
-    ImportError <-- APITimeoutError
-    ImportError <-- RateLimitError
-    ImportError <-- ParseError
+    ImportError <|-- APITimeoutError
+    ImportError <|-- RateLimitError
+    ImportError <|-- ParseError
 
-    NetworkError <-- ConnectionError
-    NetworkError <-- DNSSError
+    NetworkError <|-- ConnectionError
+    NetworkError <|-- DNSSError
 
-    ValidationError <-- GeometryError
-    ValidationError <-- MissingDataError
+    ValidationError <|-- GeometryError
+    ValidationError <|-- MissingDataError
 
     class Error {
         +string message
@@ -209,19 +209,11 @@ stateDiagram-v2
     Failure --> [*]: Throw error
 
     note right of IsRetryable
-        Retryable errors:
-        - 429 Rate Limit
-        - 5xx Server Error
-        - Network Error
-        - Timeout
+        Retryable errors: 429, 5xx, network error, timeout
     end note
 
     note right of Failure
-        Non-retryable:
-        - 400 Bad Request
-        - 401 Unauthorized
-        - 403 Forbidden
-        - 404 Not Found
+        Non-retryable: 400, 401, 403, 404
     end note
 ```
 
