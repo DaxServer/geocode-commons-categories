@@ -100,3 +100,88 @@ export type ImportConfig = {
   skipWikidata: boolean
   outputDir: string
 }
+
+/**
+ * OSM relation data for hierarchical import
+ */
+export type OSMRelation = {
+  relationId: number
+  countryCode: string
+  adminLevel: number
+  name: string
+  wikidataId: string | null
+  parentRelationId: number | null
+  geometry: string // EWKT format
+  tags: Record<string, string>
+}
+
+/**
+ * Parsed geometry from Overpass API
+ */
+export type ParsedGeometry = {
+  relationId: number
+  name: string
+  adminLevel: string
+  wikidataId: string | null
+  tags: Record<string, string>
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
+}
+
+/**
+ * Import progress tracking
+ */
+export type ImportProgress = {
+  countryCode: string
+  currentAdminLevel: number
+  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  relationsFetched: number
+  errors: number
+  startedAt: Date
+  completedAt: Date | null
+  lastError: string | null
+}
+
+/**
+ * Overpass relation element (ID only)
+ */
+export type OverpassRelationElement = {
+  type: 'relation'
+  id: number
+  tags?: {
+    name: string
+    wikidata?: string
+    admin_level?: string
+    [key: string]: string | undefined
+  }
+}
+
+/**
+ * Full Overpass element with geometry
+ */
+export type OverpassGeometryElement = {
+  type: 'relation' | 'way' | 'node'
+  id: number
+  tags?: Record<string, string>
+  members?: Array<{
+    type: 'way' | 'node' | 'relation'
+    ref: number
+    role: string
+  }>
+  geometry?: Array<{
+    lat: number
+    lon: number
+  }>
+  nodes?: number[]
+}
+
+/**
+ * Hierarchical import statistics
+ */
+export type HierarchicalImportStats = {
+  country: string
+  adminLevel: number
+  relationsFetched: number
+  relationsInserted: number
+  parentLinksResolved: number
+  errors: number
+}
