@@ -4,7 +4,7 @@
 
 import type { Effect } from 'effect'
 import pg from 'pg'
-import { tryAsync } from '../../utils/effect'
+import { tryAsync } from '../../utils/effect-helpers'
 
 const { Pool } = pg
 

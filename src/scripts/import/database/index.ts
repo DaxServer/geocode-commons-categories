@@ -6,7 +6,7 @@ import { Effect } from 'effect'
 import type { AdminBoundaryImport, ImportStats } from '../../../types/import.types'
 import { BATCH_SIZES } from '../../constants'
 import { processInBatches } from '../../utils/batch'
-import { tryAsync } from '../../utils/effect'
+import { tryAsync } from '../../utils/effect-helpers'
 import { processBatch } from './batch'
 import { closePool, getPool, testConnection } from './connection'
 
