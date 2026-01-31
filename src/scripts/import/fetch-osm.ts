@@ -5,9 +5,9 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Effect } from 'effect'
-import type { ImportConfig, OSMBoundary } from '../../types/import.types'
-import { tryAsync } from '../utils/effect-helpers'
-import { fetchBoundaries } from '../utils/overpass'
+import { tryAsync } from '@/scripts/utils/effect-helpers'
+import { fetchBoundaries } from '@/scripts/utils/overpass'
+import type { ImportConfig, OSMBoundary } from '@/types/import.types'
 
 /**
  * Fetch OSM data and save to JSON file

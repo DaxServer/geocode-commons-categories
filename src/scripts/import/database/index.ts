@@ -3,10 +3,10 @@
  */
 
 import { Effect } from 'effect'
-import type { AdminBoundaryImport, ImportStats } from '../../../types/import.types'
-import { BATCH_SIZES } from '../../constants'
-import { processInBatches } from '../../utils/batch'
-import { tryAsync } from '../../utils/effect-helpers'
+import { BATCH_SIZES } from '@/scripts/constants'
+import { processInBatches } from '@/scripts/utils/batch'
+import { tryAsync } from '@/scripts/utils/effect-helpers'
+import type { AdminBoundaryImport, ImportStats } from '@/types/import.types'
 import { processBatch } from './batch'
 import { closePool, getPool, testConnection } from './connection'
 

@@ -4,8 +4,8 @@
 
 import { Effect } from 'effect'
 import type { QueryResult } from 'pg'
-import { tryAsync } from '../../utils/effect-helpers'
-import { getPool } from './connection'
+import { getPool } from '@/scripts/import/database/connection'
+import { tryAsync } from '@/scripts/utils/effect-helpers'
 
 type CountRow = { count: string }
 type AdminLevelRow = { admin_level: string; count: string }

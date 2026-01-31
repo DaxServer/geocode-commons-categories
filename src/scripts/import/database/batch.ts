@@ -5,7 +5,7 @@
 import { Effect } from 'effect'
 // biome-ignore lint/style/useImportType: pg is used in type annotations
 import pg from 'pg'
-import type { AdminBoundaryImport } from '../../../types/import.types'
+import type { AdminBoundaryImport } from '@/types/import.types'
 import {
   beginTransaction,
   commitTransaction,

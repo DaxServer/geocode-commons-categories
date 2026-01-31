@@ -5,15 +5,15 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Effect } from 'effect'
+import { tryAsync } from '@/scripts/utils/effect-helpers'
+import { logSection } from '@/scripts/utils/logging'
+import { fetchWikimediaCategoriesBatch } from '@/scripts/utils/wikidata-api'
 import type {
   AdminBoundaryImport,
   ImportConfig,
   ImportStats,
   OSMBoundary,
-} from '../../types/import.types'
-import { tryAsync } from '../utils/effect-helpers'
-import { logSection } from '../utils/logging'
-import { fetchWikimediaCategoriesBatch } from '../utils/wikidata-api'
+} from '@/types/import.types'
 import { batchInsertBoundaries } from './database'
 import { closePool } from './database/connection'
 import { verifyImport } from './database/verification'

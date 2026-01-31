@@ -1,5 +1,5 @@
 import { pipe } from 'effect'
-import type { AdminBoundaryImport, OSMBoundary } from '../../types/import.types'
+import type { AdminBoundaryImport, OSMBoundary } from '@/types/import.types'
 
 /**
  * Convert GeoJSON Polygon to EWKT (Extended Well-Known Text)
