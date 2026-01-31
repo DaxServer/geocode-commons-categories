@@ -4,7 +4,7 @@
 
 import { Effect } from 'effect'
 import type { QueryResult } from 'pg'
-import { tryAsync } from '../../utils/effect'
+import { tryAsync } from '../../utils/effect-helpers'
 import { getPool } from './connection'
 
 type CountRow = { count: string }

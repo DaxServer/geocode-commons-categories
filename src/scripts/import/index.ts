@@ -11,7 +11,7 @@ import type {
   ImportStats,
   OSMBoundary,
 } from '../../types/import.types'
-import { tryAsync } from '../utils/effect'
+import { tryAsync } from '../utils/effect-helpers'
 import { logSection } from '../utils/logging'
 import { fetchWikimediaCategoriesBatch } from '../utils/wikidata-api'
 import { batchInsertBoundaries } from './database'

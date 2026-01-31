@@ -6,7 +6,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Effect } from 'effect'
 import type { ImportConfig, OSMBoundary } from '../../types/import.types'
-import { tryAsync } from '../utils/effect'
+import { tryAsync } from '../utils/effect-helpers'
 import { fetchBoundaries } from '../utils/overpass'
 
 /**

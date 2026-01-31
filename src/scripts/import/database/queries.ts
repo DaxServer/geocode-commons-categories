@@ -6,7 +6,7 @@ import { Effect } from 'effect'
 // biome-ignore lint/style/useImportType: pg is used in type annotations
 import pg from 'pg'
 import type { AdminBoundaryImport } from '../../../types/import.types'
-import { tryAsync } from '../../utils/effect'
+import { tryAsync } from '../../utils/effect-helpers'
 
 const insertQuery = `
   INSERT INTO admin_boundaries (wikidata_id, commons_category, admin_level, name, geom)

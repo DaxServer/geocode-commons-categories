@@ -5,7 +5,7 @@
 import { Effect } from 'effect'
 import { BATCH_SIZES, DELAYS } from '../constants'
 import { processInBatches } from './batch'
-import { tryAsync } from './effect'
+import { tryAsync } from './effect-helpers'
 
 const WIKIDATA_API_ENDPOINT = 'https://www.wikidata.org/w/api.php'
 const USER_AGENT =
