@@ -3,8 +3,8 @@
  */
 
 import { Effect } from 'effect'
-import type { OSMBoundary, OverpassFeature, OverpassResponse } from '../../types/import.types'
-import { DELAYS, RETRY_CONFIG } from '../constants'
+import { DELAYS, RETRY_CONFIG } from '@/scripts/constants'
+import type { OSMBoundary, OverpassFeature, OverpassResponse } from '@/types/import.types'
 import { tryAsync } from './effect-helpers'
 
 const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'

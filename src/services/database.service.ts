@@ -1,8 +1,8 @@
 import { Effect } from 'effect'
 import { Pool } from 'pg'
-import { config } from '../config/env'
-import { DatabaseError, NotFoundError } from '../types/errors'
-import type { AdminBoundaryRow } from '../types/geocode.types'
+import { config } from '@/config/env'
+import { DatabaseError, NotFoundError } from '@/types/errors'
+import type { AdminBoundaryRow } from '@/types/geocode.types'
 
 let pool: Pool
 

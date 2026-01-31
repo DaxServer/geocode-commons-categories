@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
-import type { DatabaseError, NotFoundError } from '../types/errors'
-import type { GeocodeResponse } from '../types/geocode.types'
+import type { DatabaseError, NotFoundError } from '@/types/errors'
+import type { GeocodeResponse } from '@/types/geocode.types'
 import { findAdminBoundary } from './database.service'
 
 export const reverseGeocode = (
