@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS osm_relations (
   name VARCHAR(255) NOT NULL,
   wikidata_id VARCHAR(20),
   parent_relation_id BIGINT,
-  geometry GEOMETRY(Polygon, 4326),
+  geometry GEOMETRY(Geometry, 4326),
   tags JSONB,
   fetched_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(relation_id, country_code)

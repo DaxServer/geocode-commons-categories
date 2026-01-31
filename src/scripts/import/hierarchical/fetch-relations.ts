@@ -3,7 +3,10 @@
  */
 
 import { Effect } from 'effect'
-import { fetchChildRelationIds, fetchRelationIds } from '@/scripts/utils/overpass-hierarchical'
+import {
+  fetchChildRelationIds,
+  fetchCountryLevelRelations,
+} from '@/scripts/utils/overpass-hierarchical'
 
 /**
  * Fetch all relation IDs for a country at all admin levels
@@ -16,9 +19,9 @@ export function fetchAllRelationIds(
   return Effect.gen(function* () {
     const relationMap = new Map<number, number[]>()
 
-    // Level 2: Fetch by country area
+    // Level 2: Fetch by country tag
     console.log(`Fetching level 2 relations for ${iso3Code}...`)
-    const level2Ids = yield* fetchRelationIds(iso3Code, 2)
+    const level2Ids = yield* fetchCountryLevelRelations(iso3Code, 2)
     if (level2Ids.length > 0) {
       relationMap.set(2, level2Ids)
     }
@@ -64,8 +67,8 @@ export function fetchRelationIdsForLevel(
 ): Effect.Effect<number[], Error> {
   return Effect.gen(function* () {
     if (adminLevel === 2) {
-      // Level 2: Fetch by country area
-      return yield* fetchRelationIds(iso3Code, 2)
+      // Level 2: Fetch by country tag
+      return yield* fetchCountryLevelRelations(iso3Code, 2)
     }
 
     // Level 3+: Fetch as children of parent relations

@@ -18,7 +18,7 @@ export const insertRelation = (relation: OSMRelation): Effect.Effect<void, Error
     yield* tryAsync(async () =>
       pool.query(
         `INSERT INTO osm_relations (relation_id, country_code, admin_level, name, wikidata_id, parent_relation_id, geometry, tags)
-         VALUES ($1, $2, $3, $4, $5, $6, ST_GeomFromText($7, 4326), $8)
+         VALUES ($1, $2, $3, $4, $5, $6, ST_MakeValid(ST_GeomFromText($7, 4326))::geometry(Geometry, 4326), $8)
          ON CONFLICT (relation_id, country_code) DO UPDATE SET
            admin_level = EXCLUDED.admin_level,
            name = EXCLUDED.name,
@@ -63,7 +63,7 @@ export const batchInsertRelations = (
         const result = yield* tryAsync(async () =>
           client.query(
             `INSERT INTO osm_relations (relation_id, country_code, admin_level, name, wikidata_id, parent_relation_id, geometry, tags)
-             VALUES ($1, $2, $3, $4, $5, $6, ST_GeomFromText($7, 4326), $8)
+             VALUES ($1, $2, $3, $4, $5, $6, ST_MakeValid(ST_GeomFromText($7, 4326))::geometry(Geometry, 4326), $8)
              ON CONFLICT (relation_id, country_code) DO UPDATE SET
                admin_level = EXCLUDED.admin_level,
                name = EXCLUDED.name,

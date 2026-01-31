@@ -10,14 +10,13 @@ import { tryAsync } from './effect-helpers'
 const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
 
 /**
- * Build query to fetch relation IDs within a country area
+ * Build query to fetch relation IDs by ISO3166-1:alpha3 tag (for country level only)
  */
-export function buildRelationIdQuery(iso3Code: string, adminLevel: number): string {
+export function buildCountryLevelQuery(iso3Code: string, adminLevel: number): string {
   return `
     [out:json][timeout:${HIERARCHICAL_IMPORT.OVERPASS_TIMEOUT}];
-    area["ISO3166-1"="${iso3Code}"]->.searchArea;
     (
-      relation["boundary"="administrative"]["admin_level"="${adminLevel}"](area.searchArea);
+      relation["boundary"="administrative"]["admin_level"="${adminLevel}"]["ISO3166-1:alpha3"="${iso3Code}"];
     );
     out ids;
   `
@@ -45,6 +44,7 @@ export function buildGeometryQuery(relationIds: number[]): string {
     [out:json][timeout:${HIERARCHICAL_IMPORT.OVERPASS_TIMEOUT}];
     (
       relation(id:${idList});
+      way(r);
     );
     out geom;
   `
@@ -100,14 +100,14 @@ export function fetchOverpass(query: string): Effect.Effect<unknown, Error> {
 }
 
 /**
- * Fetch relation IDs for a country at a specific admin level
+ * Fetch relation IDs for a country at a specific admin level (level 2 only - uses ISO3166-1:alpha3 tag)
  */
-export function fetchRelationIds(
+export function fetchCountryLevelRelations(
   iso3Code: string,
   adminLevel: number,
 ): Effect.Effect<number[], Error> {
   return Effect.gen(function* () {
-    const query = buildRelationIdQuery(iso3Code, adminLevel)
+    const query = buildCountryLevelQuery(iso3Code, adminLevel)
     const data = (yield* fetchOverpass(query)) as unknown as {
       elements: Array<{ type: string; id: number }>
     }
