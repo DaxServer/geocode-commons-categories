@@ -14,7 +14,6 @@ import {
   markFailed,
   updateProgress,
 } from './database/queries.ts'
-import { initializeSchema } from './database/schema.ts'
 import { fetchAllGeometry } from './fetch-geometry.ts'
 import { fetchAllRelationIds } from './fetch-relations.ts'
 import { linkChildrenToParents, storeRelationsWithParents } from './parent-linking.ts'
@@ -127,9 +126,6 @@ export const importAllCountries = (): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
     console.log('=== Starting hierarchical import for all countries ===')
 
-    // Initialize database schema
-    yield* initializeSchema()
-
     const allCodes = getSortedCountryCodes()
     console.log(`Importing ${allCodes.length} countries...`)
 
@@ -160,9 +156,6 @@ export const importAllCountries = (): Effect.Effect<void, Error> => {
 export const importSingleCountry = (iso3Code: string): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
     console.log(`=== Starting single country import for ${iso3Code} ===`)
-
-    // Initialize database schema
-    yield* initializeSchema()
 
     yield* importCountry(iso3Code)
 

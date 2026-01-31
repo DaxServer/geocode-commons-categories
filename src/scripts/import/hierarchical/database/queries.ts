@@ -110,24 +110,23 @@ export const markFailed = (countryCode: string, error: string): Effect.Effect<vo
 
 /**
  * Get all pending or incomplete countries
+ * Returns countries that are either in progress, failed, or not yet imported
  */
-export const getPendingCountries = (): Effect.Effect<string[], Error> => {
+export const getPendingCountries = (allCountryCodes: string[]): Effect.Effect<string[], Error> => {
   return Effect.gen(function* () {
     const pool: Pool = getPool()
 
     const result = yield* tryAsync(async () =>
       pool.query(
-        `SELECT country_code FROM import_progress WHERE status != 'completed'
-         UNION
-         SELECT $1::text AS country_code
-         WHERE NOT EXISTS (SELECT 1 FROM import_progress WHERE country_code = $1);`,
-        ['XXX'], // Dummy value for UNION - we'll filter this out
+        `SELECT code
+         FROM unnest($1::text[]) as code
+         LEFT JOIN import_progress p ON p.country_code = code
+         WHERE p.status IS NULL OR p.status != 'completed';`,
+        [allCountryCodes],
       ),
     )
 
-    return result.rows
-      .map((row: { country_code: string }) => row.country_code)
-      .filter((code: string) => code !== 'XXX')
+    return result.rows.map((row: { code: string }) => row.code)
   })
 }
 
