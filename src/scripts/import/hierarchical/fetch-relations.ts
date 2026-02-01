@@ -43,8 +43,9 @@ export function fetchAllRelationIds(
       const uniqueChildIds = Array.from(new Set(childIds))
 
       if (uniqueChildIds.length === 0) {
-        console.log(`No relations found at level ${level} for ${iso3Code}, stopping`)
-        break
+        console.log(`No relations found at level ${level} for ${iso3Code}, skipping`)
+        // Don't update parentRelations - continue using previous level's relations as search area
+        continue
       }
 
       relationMap.set(level, uniqueChildIds)

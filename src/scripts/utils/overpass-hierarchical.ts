@@ -26,10 +26,12 @@ export function buildCountryLevelQuery(iso3Code: string, adminLevel: number): st
  * Build query to fetch child relations within parent relation
  */
 export function buildChildQuery(parentRelationId: number, childLevel: number): string {
+  // Convert relation ID to area ID (Overpass area IDs for relations are 3600000000 + relationId)
+  const areaId = 3600000000 + parentRelationId
   return `
     [out:json][timeout:${HIERARCHICAL_IMPORT.OVERPASS_TIMEOUT}];
     (
-      relation["boundary"="administrative"]["admin_level"="${childLevel}"](area:${parentRelationId});
+      relation["boundary"="administrative"]["admin_level"="${childLevel}"](area:${areaId});
     );
     out ids;
   `

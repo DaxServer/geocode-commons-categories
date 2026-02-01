@@ -16,7 +16,7 @@ import {
 } from './database/queries.ts'
 import { fetchAllGeometry } from './fetch-geometry.ts'
 import { fetchAllRelationIds } from './fetch-relations.ts'
-import { linkChildrenToParents, storeRelationsWithParents } from './parent-linking.ts'
+import { storeRelationsWithParents } from './parent-linking.ts'
 
 /**
  * Import all administrative levels for a single country
@@ -47,8 +47,8 @@ function importCountry(
       const relationIds = relationMap.get(level)
 
       if (!relationIds || relationIds.length === 0) {
-        console.log(`No relations at level ${level} for ${iso3Code}, stopping`)
-        break
+        console.log(`No relations at level ${level} for ${iso3Code}, skipping`)
+        continue
       }
 
       console.log(
@@ -66,7 +66,7 @@ function importCountry(
       // Convert to OSMRelation format
       const relations = yield* storeRelationsWithParents(parsedGeometries, iso3Code, level)
 
-      // Insert to database (parent_relation_id is null initially)
+      // Insert to database
       const insertResult = yield* batchInsertRelations(relations)
 
       console.log(
@@ -74,12 +74,6 @@ function importCountry(
       )
 
       totalRelationsInserted += insertResult.inserted + insertResult.updated
-
-      // Link to parent using spatial query (except for min level which has no parent)
-      if (level > adminLevelRange.min && relationMap.has(level - 1)) {
-        const linksCreated = yield* linkChildrenToParents(iso3Code, level, level - 1)
-        console.log(`Created ${linksCreated} parent links for level ${level}`)
-      }
 
       // Update progress
       yield* updateProgress(iso3Code, {
@@ -99,8 +93,6 @@ function importCountry(
     for (const levelStat of stats.byAdminLevel) {
       console.log(`  Level ${levelStat.adminLevel}: ${levelStat.count}`)
     }
-    console.log(`Parent links: ${stats.parentLinks}`)
-    console.log(`Orphans (level > 2 without parent): ${stats.orphans}`)
   })
 }
 

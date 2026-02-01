@@ -275,3 +275,27 @@ docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
 - Migrations in `migrations/` directory mount to `/docker-entrypoint-initdb.d` and run automatically on postgres start
 - Use `IF NOT EXISTS` in migrations for idempotency (safe to re-run with fresh volumes)
 - Always test Docker changes with `docker compose down -v && docker compose up -d` before committing
+
+## GitButler Workflow
+
+This project uses GitButler CLI (`but`) for all version control operations - **never use standard git commands**
+- `but status` - Check unstaged changes and branch status
+- `but commit -c -m "message" branch-name` - Create new branch and commit unassigned changes
+- `but commit -m "message" branch-name` - Add commit to existing branch (stage files first with `but stage`)
+- `but push branch-name` - Push branch to remote
+- `but pr new branch-name -t` - Create PR using commit message for title
+
+## Hierarchical Import System
+
+New import system in `src/scripts/import/hierarchical/` for fetching administrative boundaries at multiple levels:
+- `bun import:hierarchical` - Run hierarchical import (set COUNTRY_CODE for single country)
+- `ADMIN_LEVEL_START` and `ADMIN_LEVEL_END` - Required env vars to specify admin level range
+- **Overpass area IDs**: Use `3600000000 + relationId` to convert relation IDs to area IDs for spatial queries
+- **Skip logic**: Use `continue` not `break` when admin level is empty - preserves parent chain for next level search
+- Two database tables: `osm_relations` (hierarchical import) and `admin_boundaries` (legacy import, used by main API)
+
+## Working with Temporary Files
+
+- Create temporary files in `.tmp/` directory within project (outside project root is forbidden)
+- Clean up temporary files after use: `rm .tmp/filename`
+- Use Write tool for file creation, not Bash echo redirection
