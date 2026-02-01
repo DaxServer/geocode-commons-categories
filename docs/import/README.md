@@ -5,19 +5,11 @@ Complete documentation for the geocode-commons-categories data import pipeline.
 ## Overview
 
 The import system is a multi-stage pipeline that:
-1. Fetches administrative boundary data from OpenStreetMap via hierarchical import
-2. Stores raw OSM data in `osm_relations` table with full geometries
+1. Fetches administrative boundary data from OpenStreetMap via hierarchical discovery
+2. Stores raw OSM data in `osm_relations` table
 3. Enriches the data with Wikimedia Commons categories via Wikidata
 4. Transforms and validates the data for PostgreSQL/PostGIS
 5. Inserts enriched data to `admin_boundaries` table for the API
-
-## Documentation Structure
-
-- **[Import Guide](./IMPORT_GUIDE.md)** - Complete walkthrough of the import process with examples and troubleshooting
-- **[Architecture](./architecture.md)** - High-level system architecture, component relationships, and configuration
-- **[Data Flow](./data-flow.md)** - Complete data flow diagrams, sequence diagrams, and state transitions
-- **[API Interactions](./api-interactions.md)** - External API integration details (Overpass, Wikidata)
-- **[Error Handling](./error-handling.md)** - Retry logic, error recovery, and failure handling
 
 ## Quick Start
 
@@ -26,26 +18,71 @@ The import system is a multi-stage pipeline that:
 export COUNTRY_CODE="USA"
 export DATABASE_URL="postgresql://user:pass@localhost:5432/dbname"
 
-# Run the full import pipeline
+# Option 1: Run full pipeline (recommended)
 bun import:data
 
-# Test the API (note: endpoint is /geocode, not /)
+# Option 2: OSM-only import
+bun import
+
+# Test the API
 curl "http://localhost:3000/geocode?lat=40.7128&lon=-74.0060" | jq .
 ```
+
+## Import Commands
+
+| Command | Description | Tables Affected |
+|---------|-------------|-----------------|
+| `bun import` | Fetch OSM data only | `osm_relations` |
+| `bun import:data` | Full pipeline (OSM + Wikidata) | `osm_relations` + `admin_boundaries` |
+
+### Single-Country vs Multi-Country Mode
+
+**Single-Country Mode** (default with `COUNTRY_CODE` set):
+```bash
+export COUNTRY_CODE=BEL
+bun import  # Imports only Belgium
+```
+
+**Multi-Country Mode** (no `COUNTRY_CODE` set):
+```bash
+bun import  # Imports all ~250 countries in batches
+```
+
+Multi-country mode:
+- Processes 5 countries in parallel
+- Uses 5-second delays between batches
+- Tracks progress to skip already-completed countries
+- Can be resumed if interrupted
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `COUNTRY_CODE` | Yes | - | ISO 3166-1 alpha-3 code (e.g., USA, BEL, FRA) |
+| `DATABASE_URL` | Yes | - | PostgreSQL connection string |
+| `ADMIN_LEVEL_START` | No | 4 | Start admin level (2-11) |
+| `ADMIN_LEVEL_END` | No | 11 | End admin level (2-11) |
+
+## Documentation Structure
+
+- **[Import Guide](./IMPORT_GUIDE.md)** - Complete walkthrough with examples and troubleshooting
+- **[Architecture](./architecture.md)** - System design, components, and configuration
+- **[Data Flow](./data-flow.md)** - Pipeline sequences and diagrams
+- **[API Interactions](./api-interactions.md)** - External API integration (Overpass, Wikidata)
+- **[Error Handling](./error-handling.md)** - Retry logic and error recovery
+- **[Visual Overview](./visual-overview.md)** - Visual diagrams and summaries
 
 ## Key Concepts
 
 ### Two-Table Architecture
 
-The import system uses two database tables:
-
-1. **`osm_relations`** - Raw OSM hierarchical data
-   - Populated by hierarchical import (`bun import:hierarchical`)
+1. **`osm_relations`** - Raw OSM data
+   - Populated by `bun import` or `bun import:data`
    - Full geometries from Overpass API
-   - Parent-child relationships between admin levels
+   - Discovered hierarchically using parent area queries
 
 2. **`admin_boundaries`** - Enriched data for API
-   - Populated by main orchestrator (`bun import:data`)
+   - Populated by `bun import:data` only
    - Enriched with Wikimedia Commons categories
    - Used by reverse geocoding endpoint
 
@@ -74,23 +111,50 @@ graph LR
     E --> F[Insert to admin_boundaries]
 ```
 
-## Environment Variables
+## Implementation Details
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `COUNTRY_CODE` | Yes | - | ISO 3166-1 alpha-2 country code |
-| `ADMIN_LEVEL_START` | Yes | - | Start admin level for hierarchical import |
-| `ADMIN_LEVEL_END` | Yes | - | End admin level for hierarchical import |
-| `BATCH_SIZE` | Yes | - | Database batch size |
-| `OUTPUT_DIR` | No | "./output" | Intermediate file output directory |
-| `DATABASE_URL` | Yes | - | PostgreSQL connection string |
+### Hierarchical Discovery
+
+The import system discovers administrative boundaries hierarchically:
+
+1. **Level 2 (Country):** Fetched by `ISO3166-1:alpha3` tag
+2. **Level 3+ (Children):** Fetched as children within previous level's area using Overpass area queries
+
+**Overpass Area ID Conversion:**
+```typescript
+const areaId = 3600000000 + relationId
+```
+
+### Geometry Format
+
+**EWKT (Extended Well-Known Text) format:**
+- Prefix: `SRID=4326;`
+- Example: `SRID=4326;POLYGON((4.35 50.85,4.36 50.85,...))`
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `BATCH_SIZES.WIKIDATA` | 50 | Max IDs per Wikidata API request |
+| `BATCH_SIZES.DATABASE` | 1000 | Records per database transaction |
+| `BATCH_SIZES.OVERPASS_GEOMETRY` | 100 | Relations per geometry fetch |
+| `DELAYS.RATE_LIMIT_MS` | 100 | Delay between Wikidata batches |
+| `DELAYS.OVERPASS_GEOMETRY_MS` | 250 | Delay between Overpass geometry requests |
+| `DELAYS.RETRY_EXPONENTIAL_BASE` | 2 | Exponential base for retry delays |
+| `DELAYS.COUNTRY_BATCH_MS` | 5000 | Delay between country batches |
+| `RETRY_CONFIG.MAX_ATTEMPTS` | 3 | Max retry attempts for API calls |
+| `RETRY_CONFIG.BASE_DELAY_MS` | 1000 | Base delay for exponential backoff |
+| `IMPORT.COUNTRY_BATCH_SIZE` | 5 | Countries per batch (multi-country) |
+| `IMPORT.OVERPASS_TIMEOUT` | 90 | Overpass query timeout (seconds) |
+
+**Retry Formula:** `delay = BASE_DELAY_MS × RETRY_EXPONENTIAL_BASE^(attempt-1)`
 
 ## Performance Characteristics
 
-- **Hierarchical Import**: Uses Overpass API for discovery and geometry fetch
-- **Wikidata API**: 50 IDs per request, 100ms delay between batches
-- **Database Insert**: 1000 records per transaction
-- **Typical Import Time**: 5-15 minutes for medium-sized countries
+- **Hierarchical Import:** Uses Overpass API for discovery and geometry fetch
+- **Wikidata API:** 50 IDs per request, 100ms delay between batches
+- **Database Insert:** 1000 records per transaction
+- **Typical Import Time:** 5-15 minutes for medium-sized countries
 
 ## Data Validation
 
@@ -106,10 +170,11 @@ The import system validates:
 ### Geometries
 
 The import fetches full geometries from Overpass API using `out geom;`:
-- ✅ Accurate boundary representations
+- ✅ Accurate boundary representations (full polygon geometries)
 - ✅ No overlapping bounding boxes
-- ⚠️ Slower than bounding box approximation
 - ⚠️ May timeout for very large countries (use admin level range to limit)
+
+**Note:** The system uses `out geom` to fetch complete polygon geometries, not `out ids` or `out bb`. This provides accurate boundaries but may be slower for very large regions.
 
 ## Troubleshooting
 

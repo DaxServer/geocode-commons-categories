@@ -74,7 +74,7 @@ export function enrichDatabaseRowsWithWikidata(
     admin_level: number
     name: string
     geom: string
-    iso3: string
+    country_code: string
   }>,
   wikidataCategories: Map<string, string>,
 ): AdminBoundaryImport[] {
@@ -193,7 +193,7 @@ export function transformDatabaseRows(
     admin_level: number
     name: string
     geom: string
-    iso3: string
+    country_code: string
   }>,
   wikidataCategories: Map<string, string>,
 ): AdminBoundaryImport[] {
