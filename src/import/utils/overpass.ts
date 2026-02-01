@@ -3,11 +3,8 @@
  */
 
 import { Effect } from 'effect'
-import { DELAYS, RETRY_CONFIG } from '@/import/constants'
-import { tryAsync } from '@/import/utils/effect-helpers'
+import { fetchOverpass } from '@/import/utils/retry'
 import type { OSMBoundary, OverpassFeature, OverpassResponse } from '@/types/import.types'
-
-const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
 
 /**
  * Build Overpass QL query for administrative boundaries
@@ -141,51 +138,8 @@ function convertToGeoJSON(elements: OverpassResponse['elements']): OverpassFeatu
 /**
  * Fetch boundaries from Overpass API with retry logic
  */
-function fetchWithRetry(query: string): Effect.Effect<OverpassResponse, Error> {
-  return Effect.gen(function* () {
-    for (let attempt = 0; attempt < RETRY_CONFIG.MAX_ATTEMPTS; attempt++) {
-      const response = yield* Effect.either(
-        tryAsync(async () =>
-          fetch(OVERPASS_API_URL, {
-            method: 'POST',
-            body: query,
-            headers: {
-              'Content-Type': 'text/plain',
-              Accept: 'application/json',
-            },
-          }),
-        ),
-      )
-
-      if (response._tag === 'Left') {
-        if (attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
-          const delay = RETRY_CONFIG.BASE_DELAY_MS * DELAYS.RETRY_EXPONENTIAL_BASE ** attempt
-          console.warn(`Request failed, retrying in ${delay}ms...`, response.left)
-          yield* Effect.sleep(`${delay} millis`)
-          continue
-        }
-        return yield* Effect.fail(response.left)
-      }
-
-      const res = response.right
-
-      if (!res.ok) {
-        if (res.status === 429 && attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
-          const delay = RETRY_CONFIG.BASE_DELAY_MS * DELAYS.RETRY_EXPONENTIAL_BASE ** attempt
-          console.warn(`Rate limited, waiting ${delay}ms...`)
-          yield* Effect.sleep(`${delay} millis`)
-          continue
-        }
-        return yield* Effect.fail(new Error(`Overpass API error: ${res.status} ${res.statusText}`))
-      }
-
-      const data = yield* tryAsync(async () => (await res.json()) as OverpassResponse)
-
-      return data
-    }
-
-    return yield* Effect.fail(new Error('Max retries exceeded'))
-  })
+function fetchBoundariesFromAPI(query: string): Effect.Effect<OverpassResponse, Error> {
+  return fetchOverpass<OverpassResponse>(query)
 }
 
 /**
@@ -200,7 +154,7 @@ export const fetchBoundaries = (
     console.log(`Fetching boundaries${countryCode ? ` for ${countryCode}` : ' globally'}...`)
     console.log(`Query: ${query}`)
 
-    const data = yield* fetchWithRetry(query)
+    const data = yield* fetchBoundariesFromAPI(query)
 
     if (!data.elements || data.elements.length === 0) {
       console.warn('No boundaries found in Overpass response')
@@ -247,7 +201,7 @@ export const fetchBoundariesByBBox = (
 
     console.log(`Fetching boundaries for bbox: ${south},${west},${north},${east}`)
 
-    const data = yield* fetchWithRetry(query)
+    const data = yield* fetchBoundariesFromAPI(query)
 
     if (!data.elements || data.elements.length === 0) {
       return []

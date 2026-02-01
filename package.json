@@ -6,12 +6,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "bun src/index.ts",
-    "typecheck": "bun --bun tsc --noEmit",
-    "lint": "bun biome check .",
     "format": "bun biome format --write .",
     "format:check": "bun biome format --write . && bun biome check .",
-    "import:data": "bun src/import/index.ts",
-    "import": "bun src/import/import.ts"
+    "lint": "bun biome check .",
+    "import": "bun src/import/import.ts",
+    "typecheck": "bun --bun tsc --noEmit"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.13",
