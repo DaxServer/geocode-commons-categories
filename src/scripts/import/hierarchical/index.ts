@@ -4,9 +4,9 @@
  */
 
 import { Effect } from 'effect'
+import { batchInsertRelations } from '@/database/insert.ts'
 import { DELAYS, getAdminLevelRange, HIERARCHICAL_IMPORT } from '@/scripts/constants'
-import { batchCountryCodes, getSortedCountryCodes } from '@/scripts/utils/taginfo'
-import { batchInsertRelations } from './database/insert.ts'
+import { batchCountryCodes, getSortedCountryCodes } from '@/scripts/utils/country-codes.ts'
 import {
   getCountryStats,
   initializeProgress,

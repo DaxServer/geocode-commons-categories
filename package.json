@@ -11,8 +11,6 @@
     "format": "bun biome format --write .",
     "format:check": "bun biome format --write . && bun biome check .",
     "import:data": "bun src/scripts/import/index.ts",
-    "import:osm": "bun src/scripts/import/fetch-osm.ts",
-    "import:database": "bun src/scripts/import/database.ts",
     "import:hierarchical": "bun src/scripts/import/hierarchical/index.ts"
   },
   "devDependencies": {

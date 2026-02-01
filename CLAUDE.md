@@ -28,9 +28,8 @@ bun format:check # Format and lint (applies auto-fixes)
 ### Data Import
 
 ```bash
-bun import:data     # Run full import pipeline (orchestrator)
-bun import:osm      # Fetch OSM data only
-bun import:database # Batch insert to database only
+bun import:data         # Run full import pipeline (orchestrator)
+bun import:hierarchical  # Run hierarchical import (fetches OSM data to osm_relations table)
 ```
 
 ### Biome Workflow
@@ -55,11 +54,16 @@ src/
 └── scripts/               # Data import system
     ├── constants.ts           # Import configuration constants
     ├── import/
-    │   ├── index.ts           # Main orchestrator
-    │   ├── fetch-osm.ts       # Fetch OSM boundaries via Overpass API
-    │   └── database/          # Batch insert operations
+    │   ├── index.ts           # Main orchestrator (uses hierarchical import)
+    │   ├── hierarchical/      # Hierarchical OSM data import system
+    │   │   ├── index.ts       # Hierarchical import entry point
+    │   │   ├── fetch-relations.ts   # Fetch relation IDs from Taginfo
+    │   │   ├── fetch-geometry.ts    # Fetch geometries from Overpass
+    │   │   └── database/      # Database operations for osm_relations table
+    │   ├── transform.ts       # Transform OSM data with Wikidata enrichment
+    │   └── database/          # Batch insert operations for admin_boundaries table
     └── utils/
-        ├── effect.ts          # Effect TS helpers (tryAsync, toError)
+        ├── effect-helpers.ts  # Effect TS helpers (tryAsync, toError)
         ├── batch.ts           # Batch processing utilities
         ├── wikidata-api.ts    # Wikidata REST API client
         └── logging.ts         # Logging utilities
@@ -161,35 +165,80 @@ export class DatabaseError extends Error {
 
 ### Import Architecture
 
-- **OSM data**: Fetched via Overpass API with wikidata tags already present
-  - Uses `out bb;` query format to get bounding boxes (minlat, minlon, maxlat, maxlon)
-  - Converts bounding boxes to GeoJSON Polygon (4 corner points)
-  - **Known limitation**: Bounding boxes are approximations, may overlap at borders
-- **Wikidata data**: Uses Wikidata REST API (`wbgetentities` action) - simpler than SPARQL
-- **Batch processing**: Up to 50 IDs per request with 100ms rate limiting
-- **Error resilience**: Continues processing even with partial failures
-- **Progress tracking**: Logs statistics and skipped entities
+The import system uses a **two-table approach**:
+
+1. **`osm_relations` table**: Stores raw OSM hierarchical data with full geometries
+   - Fetched via hierarchical import system (`import:hierarchical`)
+   - Uses Overpass API to discover relations and fetch full geometries
+   - Stores parent-child relationships between admin levels
+
+2. **`admin_boundaries` table**: Stores enriched data for the main API
+   - Populated by `import:data` orchestrator
+   - Enriched with Wikimedia Commons categories from Wikidata
+   - Used by the reverse geocoding API endpoint
+
+### Import Pipeline Flow
+
+```
+Step 1: Hierarchical Import (→ osm_relations)
+  └─ Discover and fetch relation IDs from Overpass API
+  └─ Fetch full geometries from Overpass API
+  └─ Insert to osm_relations table
+
+Step 2: Extract Wikidata IDs (from osm_relations)
+  └─ Query osm_relations for wikidata_id values
+
+Step 3: Fetch Wikidata Categories
+  └─ Batch process up to 50 IDs per request
+  └─ Extract P373 property (Commons category)
+
+Step 4: Transform & Enrich (→ admin_boundaries)
+  └─ Query osm_relations with geometry
+  └─ Merge with Wikidata categories
+  └─ Validate geometries
+  └─ Convert to EWKT format
+
+Step 5: Insert to admin_boundaries
+  └─ Batch insert with transactions
+  └─ ON CONFLICT DO UPDATE for idempotency
+
+Step 6: Verification
+  └─ Query total count and distribution
+  └─ Validate geometries with PostGIS
+```
 
 ### Import Scripts Structure
 
 ```
 src/scripts/
-├── constants.ts        # BATCH_SIZE, RATE_LIMIT_MS, admin levels
+├── constants.ts              # BATCH_SIZE, RATE_LIMIT_MS, admin levels
 ├── import/
-│   ├── index.ts        # Orchestrator: fetch → transform → insert
-│   ├── fetch-osm.ts    # Overpass API integration
-│   └── database/       # Batch insert with transaction support
+│   ├── index.ts              # Main orchestrator (run import:data)
+│   ├── hierarchical/
+│   │   ├── index.ts          # Hierarchical import entry point
+│   │   ├── fetch-relations.ts # Fetch relation IDs from Taginfo
+│   │   ├── fetch-geometry.ts  # Fetch geometries from Overpass
+│   │   ├── database/
+│   │   │   ├── insert.ts     # Insert to osm_relations table
+│   │   │   └── queries.ts    # Query and progress tracking
+│   │   └── parent-linking.ts  # Build parent-child relationships
+│   ├── transform.ts          # Transform with Wikidata enrichment
+│   └── database/
+│       ├── index.ts          # Batch insert to admin_boundaries
+│       ├── connection.ts     # Database connection pool
+│       └── queries.ts        # Database queries
 └── utils/
-    ├── effect.ts       # Effect TS helpers
-    ├── batch.ts        # Batch processing logic
-    ├── wikidata-api.ts # REST API client
-    └── logging.ts      # Progress logging
+    ├── effect-helpers.ts     # Effect TS helpers (tryAsync, toError)
+    ├── batch.ts              # Batch processing logic
+    ├── wikidata-api.ts       # REST API client
+    └── logging.ts            # Progress logging
 ```
 
 ### Environment Variables for Import
 
 - `COUNTRY_CODE` - ISO country code (required)
-- `ADMIN_LEVELS` - Comma-separated admin levels (default: "4,6,8")
+- `ADMIN_LEVEL_START` - Start admin level (default: 4)
+- `ADMIN_LEVEL_END` - End admin level (default: 11)
 - `BATCH_SIZE` - Wikidata API batch size (default: 50)
 - `RATE_LIMIT_MS` - Delay between batches (default: 100)
 - `OUTPUT_DIR` - Optional intermediate file output (code handles null safely)
@@ -248,7 +297,12 @@ The project uses strict TypeScript configuration with several safety features en
 
 ### Database Schema
 
-- **boundaries** table with PostGIS geometry column
+- **`osm_relations` table**: Stores raw OSM hierarchical data
+  - Columns: id, wikidata_id, admin_level, name, geom (PostGIS), iso3, parent_id
+  - Used as source for Wikidata enrichment and admin_boundaries population
+- **`admin_boundaries` table**: Enriched data for reverse geocoding API
+  - Columns: wikidata_id, commons_category, admin_level, name, geom (PostGIS)
+  - Used by the main API endpoint `/geocode`
 - **Indexes**: GIST spatial index, admin_level, wikidata_id
 - **Spatial queries**: ST_Contains() for point-in-polygon checks
 - **Connection pooling**: Singleton pattern in `getPool()`

@@ -1,6 +1,5 @@
 /**
- * ISO3 country codes from taginfo (hardcoded for stability)
- * Source: https://taginfo.openstreetmap.org/keys/country#values
+ * ISO3 country codes from taginfo
  */
 
 export const ISO3_COUNTRY_CODES: string[] = [

@@ -5,10 +5,11 @@ Complete documentation for the geocode-commons-categories data import pipeline.
 ## Overview
 
 The import system is a multi-stage pipeline that:
-1. Fetches administrative boundary data from OpenStreetMap via the Overpass API
-2. Enriches the data with Wikimedia Commons categories via Wikidata
-3. Transforms and validates the data for PostgreSQL/PostGIS
-4. Batch inserts the data with transaction safety
+1. Fetches administrative boundary data from OpenStreetMap via hierarchical import
+2. Stores raw OSM data in `osm_relations` table with full geometries
+3. Enriches the data with Wikimedia Commons categories via Wikidata
+4. Transforms and validates the data for PostgreSQL/PostGIS
+5. Inserts enriched data to `admin_boundaries` table for the API
 
 ## Documentation Structure
 
@@ -22,8 +23,7 @@ The import system is a multi-stage pipeline that:
 
 ```bash
 # Set required environment variables
-export COUNTRY_CODE="US"
-export ADMIN_LEVELS="4,6,8"
+export COUNTRY_CODE="USA"
 export DATABASE_URL="postgresql://user:pass@localhost:5432/dbname"
 
 # Run the full import pipeline
@@ -31,13 +31,23 @@ bun import:data
 
 # Test the API (note: endpoint is /geocode, not /)
 curl "http://localhost:3000/geocode?lat=40.7128&lon=-74.0060" | jq .
-
-# Or run individual stages
-bun import:osm        # Fetch OSM data only
-bun import:database   # Insert to database only (requires INPUT_FILE)
 ```
 
 ## Key Concepts
+
+### Two-Table Architecture
+
+The import system uses two database tables:
+
+1. **`osm_relations`** - Raw OSM hierarchical data
+   - Populated by hierarchical import (`bun import:hierarchical`)
+   - Full geometries from Overpass API
+   - Parent-child relationships between admin levels
+
+2. **`admin_boundaries`** - Enriched data for API
+   - Populated by main orchestrator (`bun import:data`)
+   - Enriched with Wikimedia Commons categories
+   - Used by reverse geocoding endpoint
 
 ### Effect TS Integration
 
@@ -57,11 +67,11 @@ Two levels of batch processing:
 
 ```mermaid
 graph LR
-    A[OSM Data] --> B[Extract Wikidata IDs]
+    A[OSM Relations] --> B[Extract Wikidata IDs]
     B --> C[Fetch Commons Categories]
     C --> D[Enrich Boundaries]
     D --> E[Validate Geometries]
-    E --> F[Insert to Database]
+    E --> F[Insert to admin_boundaries]
 ```
 
 ## Environment Variables
@@ -69,19 +79,18 @@ graph LR
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `COUNTRY_CODE` | Yes | - | ISO 3166-1 alpha-2 country code |
-| `ADMIN_LEVELS` | No | "4,6,8" | Comma-separated admin levels |
-| `BATCH_SIZE` | No | 1000 | Database batch size |
+| `ADMIN_LEVEL_START` | Yes | - | Start admin level for hierarchical import |
+| `ADMIN_LEVEL_END` | Yes | - | End admin level for hierarchical import |
+| `BATCH_SIZE` | Yes | - | Database batch size |
 | `OUTPUT_DIR` | No | "./output" | Intermediate file output directory |
 | `DATABASE_URL` | Yes | - | PostgreSQL connection string |
-| `SKIP_WIKIDATA` | No | false | Skip Wikidata enrichment stage |
-| `INPUT_FILE` | No* | - | JSON file for database-only import (required for `bun import:database`) |
 
 ## Performance Characteristics
 
-- **Overpass API**: Single large query, ~1-30 seconds depending on country size
+- **Hierarchical Import**: Uses Overpass API for discovery and geometry fetch
 - **Wikidata API**: 50 IDs per request, 100ms delay between batches
 - **Database Insert**: 1000 records per transaction
-- **Typical Import Time**: 2-10 minutes for medium-sized countries
+- **Typical Import Time**: 5-15 minutes for medium-sized countries
 
 ## Data Validation
 
@@ -89,33 +98,18 @@ The import system validates:
 - ✅ All boundaries have valid geometries (PostGIS `ST_IsValid`)
 - ✅ Wikidata IDs are properly formatted with "Q" prefix (Q\d+)
 - ✅ Commons categories are extracted from P373 property
-- ✅ No duplicate wikidata_id entries
+- ✅ No duplicate wikidata_id entries in admin_boundaries
 - ✅ admin_level values are within expected range
-- ⚠️ **Geometries use bounding box approximation** - see [Known Limitations](#known-limitations) below
 
 ## Known Limitations
 
-### Bounding Box Geometry
+### Geometries
 
-The current implementation uses **bounding box rectangles** instead of full administrative boundary polygons. This is a trade-off between query complexity and accuracy:
-
-**Impact:**
-- ⚠️ Point-in-polygon queries may be inaccurate for:
-  - Border regions where bounding boxes overlap
-  - Coastal areas with irregular boundaries
-  - Municipalities with complex shapes
-- ✅ Benefits:
-  - Faster Overpass API queries (no timeout issues)
-  - Smaller response size
-  - Simpler geometry processing
-
-**Example Issue:**
-A coordinate in Ghent, Belgium might incorrectly match a French region if their bounding boxes overlap.
-
-**Future Improvements:**
-- Implement full polygon geometry processing with `out body; >;` queries
-- Add geometry simplification to reduce complexity
-- Use alternative data sources with pre-built polygons
+The import fetches full geometries from Overpass API using `out geom;`:
+- ✅ Accurate boundary representations
+- ✅ No overlapping bounding boxes
+- ⚠️ Slower than bounding box approximation
+- ⚠️ May timeout for very large countries (use admin level range to limit)
 
 ## Troubleshooting
 
