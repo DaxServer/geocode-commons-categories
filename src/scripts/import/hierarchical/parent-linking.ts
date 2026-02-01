@@ -1,10 +1,9 @@
 /**
- * Parent-child linking using PostGIS spatial queries
+ * Geometry conversion utilities for hierarchical import
  */
 
 import { Effect } from 'effect'
 import type { OSMRelation } from '@/types/import.types'
-import { updateParentsWithSpatialQuery } from './database/insert.ts'
 
 /**
  * Convert ParsedGeometry to OSMRelation for database insertion
@@ -19,7 +18,6 @@ export function convertToOSMRelation(
     geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
   },
   countryCode: string,
-  parentRelationId: number | null,
 ): OSMRelation {
   // Convert geometry to EWKT
   const ewkt = geometryToEWKT(parsed.geometry)
@@ -30,9 +28,8 @@ export function convertToOSMRelation(
     adminLevel: parseInt(parsed.adminLevel, 10),
     name: parsed.name,
     wikidataId: parsed.wikidataId,
-    parentRelationId,
-    tags: parsed.tags,
     geometry: ewkt,
+    tags: parsed.tags,
   }
 }
 
@@ -133,30 +130,8 @@ function geometryToEWKT(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon): strin
 }
 
 /**
- * Link children to parents using PostGIS spatial queries
- * This is called after inserting all relations at a given level
- */
-export function linkChildrenToParents(
-  countryCode: string,
-  childLevel: number,
-  parentLevel: number,
-): Effect.Effect<number, Error> {
-  return Effect.gen(function* () {
-    console.log(
-      `Linking level ${childLevel} children to level ${parentLevel} parents for ${countryCode}...`,
-    )
-
-    const linksUpdated = yield* updateParentsWithSpatialQuery(countryCode, childLevel, parentLevel)
-
-    console.log(`Created ${linksUpdated} parent links for ${countryCode} at level ${childLevel}`)
-
-    return linksUpdated
-  })
-}
-
-/**
- * Store relations with parent linking
- * Converts parsed geometries to OSMRelation format and inserts to database
+ * Store relations for database insertion
+ * Converts parsed geometries to OSMRelation format
  */
 export function storeRelationsWithParents(
   parsedGeometries: Array<{
@@ -171,10 +146,8 @@ export function storeRelationsWithParents(
   adminLevel: number,
 ): Effect.Effect<OSMRelation[], Error> {
   return Effect.gen(function* () {
-    // Convert to OSMRelation format (parent linking happens via spatial query after insert)
-    const relations = parsedGeometries.map((parsed) =>
-      convertToOSMRelation(parsed, countryCode, null),
-    )
+    // Convert to OSMRelation format
+    const relations = parsedGeometries.map((parsed) => convertToOSMRelation(parsed, countryCode))
 
     console.log(`Converted ${relations.length} relations for ${countryCode} at level ${adminLevel}`)
 

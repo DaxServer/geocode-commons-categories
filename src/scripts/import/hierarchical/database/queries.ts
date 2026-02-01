@@ -165,8 +165,6 @@ export const getCountryStats = (
   {
     totalRelations: number
     byAdminLevel: Array<{ adminLevel: number; count: number }>
-    parentLinks: number
-    orphans: number
   },
   Error
 > => {
@@ -187,30 +185,12 @@ export const getCountryStats = (
       ),
     )
 
-    const parentResult = yield* tryAsync(async () =>
-      pool.query(
-        `SELECT COUNT(*) as count FROM osm_relations
-         WHERE country_code = $1 AND parent_relation_id IS NOT NULL;`,
-        [countryCode],
-      ),
-    )
-
-    const orphanResult = yield* tryAsync(async () =>
-      pool.query(
-        `SELECT COUNT(*) as count FROM osm_relations
-         WHERE country_code = $1 AND admin_level > 2 AND parent_relation_id IS NULL;`,
-        [countryCode],
-      ),
-    )
-
     return {
       totalRelations: parseInt(totalResult.rows[0].count as string, 10),
       byAdminLevel: levelResult.rows.map((row) => ({
         adminLevel: row.admin_level,
         count: parseInt(row.count as string, 10),
       })),
-      parentLinks: parseInt(parentResult.rows[0].count as string, 10),
-      orphans: parseInt(orphanResult.rows[0].count as string, 10),
     }
   })
 }

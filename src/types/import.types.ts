@@ -110,7 +110,6 @@ export type OSMRelation = {
   adminLevel: number
   name: string
   wikidataId: string | null
-  parentRelationId: number | null
   geometry: string // EWKT format
   tags: Record<string, string>
 }
@@ -182,6 +181,5 @@ export type HierarchicalImportStats = {
   adminLevel: number
   relationsFetched: number
   relationsInserted: number
-  parentLinksResolved: number
   errors: number
 }
