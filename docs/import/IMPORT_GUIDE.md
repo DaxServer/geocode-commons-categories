@@ -12,39 +12,43 @@ Complete walkthrough of the administrative boundary data import process.
 
 ## Overview
 
-The import system fetches administrative boundary data for a country, enriches it with Wikimedia Commons categories, and stores it in a PostGIS-enabled PostgreSQL database for reverse geocoding.
+The import system fetches administrative boundary data for a country using a two-table approach:
+1. **Hierarchical import** → `osm_relations` table (raw OSM data with full geometries)
+2. **Main pipeline** → `admin_boundaries` table (enriched with Wikimedia Commons categories)
 
 **What gets imported:**
 - Administrative boundaries (regions, provinces, municipalities)
 - Wikidata IDs for each boundary
 - Wikimedia Commons categories
-- Geometries for spatial queries
+- Full geometries for accurate spatial queries
 
 ## What Happens During Import
 
 The import pipeline goes through **6 stages**:
 
-### Stage 1: Fetch OSM Data
-1. **Builds Overpass QL query** for the target country and admin levels
-2. **Calls Overpass API** to fetch boundary relations
-3. **Converts response** to structured OSMBoundary objects
-4. **Saves intermediate file** (optional, if `OUTPUT_DIR` is set)
+### Stage 1: Hierarchical Import
+1. **Discovers relation IDs** by querying Overpass API for admin_level
+2. **Fetches geometries** from Overpass API using `out geom;`
+3. **Inserts to osm_relations** table with full geometries
 
 **What you'll see:**
 ```
-=== Fetching OSM Boundary Data ===
-Fetching boundaries for BE...
-Found 584 boundaries
+=== Starting hierarchical import for USA ===
+Admin level range: 4 to 8
+Fetching level 4 relations for USA...
+Found 50 unique relations at level 4
+Fetched 50 geometries for USA at level 4
 ```
 
 ### Stage 2: Extract Wikidata IDs
-1. **Scans all OSM boundaries** for `wikidata` tags
-2. **Formats IDs** by removing URL prefixes but keeping the "Q" prefix
-3. **Counts unique IDs** for batch processing
+1. **Queries osm_relations** table for wikidata_id values
+2. **Filters NULL values** and counts unique IDs
 
 **What you'll see:**
 ```
-Found 584 unique Wikidata IDs in OSM data
+Step 2: Extracting Wikidata IDs from OSM relations
+Found 3000 OSM relations with Wikidata IDs
+Extracted 3000 unique Wikidata IDs
 ```
 
 ### Stage 3: Fetch Commons Categories
@@ -56,29 +60,30 @@ Found 584 unique Wikidata IDs in OSM data
 
 **What you'll see:**
 ```
-Processing batch 1/12...
-Batch 1 complete: 49 categories fetched
+Step 3: Fetching Commons categories from Wikidata
+Processing batch 1/60...
+Batch 1 complete: 48 categories fetched
 ...
-Total Commons categories fetched: 580/584
+Total Commons categories fetched: 2950/3000
 ```
 
 ### Stage 4: Transform and Enrich
-1. **Merges OSM data** with Wikidata categories
-2. **Validates geometries** (PostGIS `ST_IsValid`)
-3. **Converts to EWKT** (Extended Well-Known Text) format
+1. **Queries osm_relations** with geometry data
+2. **Merges OSM data** with Wikidata categories
+3. **Validates EWKT format** of geometries
 4. **Removes duplicates** by Wikidata ID
 5. **Filters out records** without Commons categories
 
 **What you'll see:**
 ```
-=== Enriching OSM Boundaries with Wikidata Data ===
-Enriched: 580 boundaries
-Skipped: 4 boundaries (no wikidata tag or Commons category)
+Step 4: Transforming and enriching data
+=== Enriching Database Rows with Wikidata Data ===
+Enriched: 2950 boundaries
+Skipped: 50 rows (no wikidata_id or Commons category)
 === Validating Geometries ===
-Valid geometries: 580
-Invalid geometries: 0
+Valid geometries: 2950
 === Deduplicating Boundaries ===
-Unique boundaries: 580
+Unique boundaries: 2950
 ```
 
 ### Stage 5: Database Insert
@@ -90,11 +95,12 @@ Unique boundaries: 580
 
 **What you'll see:**
 ```
+Step 5: Inserting data into admin_boundaries table
 === Inserting Boundaries into Database ===
-Processing batch 1/12
-Batch 1 committed: 50 total inserted
+Processing batch 1/3
+Batch 1 committed: 1000 total inserted
 ...
-Successfully inserted: 580
+Successfully inserted: 2950
 Errors: 0
 ```
 
@@ -106,13 +112,14 @@ Errors: 0
 
 **What you'll see:**
 ```
+Step 6: Verifying import
 === Verifying Import ===
-Total records in database: 580
+Total records in database: 2950
 
 Records by admin level:
-  Level 4: 4
-  Level 6: 12
-  Level 8: 564
+  Level 4: 50
+  Level 6: 300
+  Level 8: 2600
 
 Invalid geometries: 0
 ```
@@ -136,20 +143,25 @@ Create a `.env` file:
 ```bash
 # Required
 DATABASE_URL=postgresql://geocode:geocode@localhost:5432/geocode
-COUNTRY_CODE=BE  # ISO country code
-ADMIN_LEVELS=4,6,8
+COUNTRY_CODE=BEL  # ISO country code
 
-# Optional
+# Optional - for hierarchical import
+ADMIN_LEVEL_START=4  # Start admin level (default: 4)
+ADMIN_LEVEL_END=8    # End admin level (default: 11)
+
+# Optional - for Wikidata enrichment
 BATCH_SIZE=50
 RATE_LIMIT_MS=100
+
+# Optional - for debugging
 OUTPUT_DIR=./output
-SKIP_WIKIDATA=false
 ```
 
 ### 3. Verify Database is Ready
 
 ```bash
 docker compose exec postgres psql -U geocode -d geocode -c "SELECT 1;"
+docker compose exec postgres psql -U geocode -d geocode -c "\d osm_relations"
 docker compose exec postgres psql -U geocode -d geocode -c "\d admin_boundaries"
 ```
 
@@ -159,23 +171,20 @@ docker compose exec postgres psql -U geocode -d geocode -c "\d admin_boundaries"
 
 ```bash
 # Set environment variables
-export COUNTRY_CODE=BE
-export ADMIN_LEVELS=4,6,8
+export COUNTRY_CODE=BEL
+export ADMIN_LEVEL_START=4
+export ADMIN_LEVEL_END=8
 export DATABASE_URL=postgresql://geocode:geocode@localhost:5432/geocode
 
 # Run complete pipeline
 bun import:data
 ```
 
-### Stage-by-Stage Import
+### Hierarchical Import Only
 
 ```bash
-# 1. Fetch OSM data only
-bun import:osm
-
-# 2. Insert from file (requires INPUT_FILE)
-export INPUT_FILE=./output/osm-be.json
-bun import:database
+# Run hierarchical import to populate osm_relations table
+bun import:hierarchical
 ```
 
 ### With Output Files
@@ -184,7 +193,7 @@ bun import:database
 # Enable intermediate file output
 export OUTPUT_DIR=./output
 
-# Run import (saves osm-{country}.json and transformed-{country}.json)
+# Run import (saves transformed-{country}.json)
 bun import:data
 ```
 
@@ -192,14 +201,23 @@ bun import:data
 
 ### OpenStreetMap (via Overpass API)
 
-**Query format:**
+**Overpass API** - Relation Discovery:
 ```overpass
 [out:json][timeout:90];
-area["ISO3166-1"="{COUNTRY_CODE}"]->.searchArea;
+area["ISO3166-1"="{country_code}"]->.searchArea;
 (
-  relation["boundary"="administrative"]["admin_level"~"^({ADMIN_LEVELS})$"](area.searchArea);
+  relation["boundary"="administrative"]["admin_level"="{level}"](area.searchArea);
 );
-out bb;
+out ids;
+```
+
+**Overpass API** - Geometry Fetch:
+```overpass
+[out:json][timeout:90];
+(
+  id_{relation_id};
+);
+out geom;
 ```
 
 **Response includes:**
@@ -207,7 +225,7 @@ out bb;
 - Name (`name` tag)
 - Admin level (`admin_level` tag)
 - Wikidata ID (`wikidata` tag)
-- Bounding box (`bounds`)
+- Full geometry (polygon with all coordinates)
 
 ### Wikimedia Commons (via Wikidata API)
 
@@ -227,18 +245,18 @@ out bb;
 
 ## Common Issues
 
-### Issue: Overpass API Timeout
+### Issue: Hierarchical Import Timeout
 
 **Symptoms:** `Error: Overpass API error: 504 Gateway Timeout`
 
 **Solution:**
-- Use `out bb;` instead of `out body; >;`
-- Reduce admin levels (fewer boundaries)
+- Reduce admin level range (e.g., `ADMIN_LEVEL_START=4 ADMIN_LEVEL_END=6`)
 - Import smaller countries first
+- Use `COUNTRY_CODE` for single country instead of global import
 
 ### Issue: No Commons Categories Found
 
-**Symptoms:** `Total Commons categories fetched: 0/584`
+**Symptoms:** `Total Commons categories fetched: 0/3000`
 
 **Causes:**
 - Wikidata IDs missing "Q" prefix (fixed in current version)
@@ -250,44 +268,20 @@ out bb;
 - Verify internet connection
 - Check for API error messages
 
-### Issue: Import Completes but API Returns 404
-
-**Symptoms:**
-```
-Import complete: 580 records
-curl "http://localhost:3000/geocode?lat=50.85&lon=4.35"
-# Returns: {"error": "Location not found"}
-```
-
-**Causes:**
-- App service needs restart (database connection pool)
-- Bounding box geometry inaccuracy (known limitation)
-
-**Solution:**
-```bash
-docker compose restart app
-# Wait 10 seconds for startup
-curl "http://localhost:3000/geocode?lat=50.85&lon=4.35"
-```
-
-### Issue: Wrong Location Returned
-
-**Symptoms:** Query returns wrong admin boundary
-
-**Cause:** Bounding box overlap (known limitation)
-
-**Example:**
-- Query for Ghent, Belgium returns Hauts-de-France, France
-- Their bounding boxes overlap at the border
-
-**Solution:** This is a known trade-off. For accurate results, implement full polygon geometry.
-
 ## Import Verification
 
 After import completes, verify with these queries:
 
 ### Check Record Counts
 ```sql
+-- Check osm_relations (raw data)
+SELECT admin_level, COUNT(*)
+FROM osm_relations
+WHERE iso3 = 'BEL'
+GROUP BY admin_level
+ORDER BY admin_level;
+
+-- Check admin_boundaries (enriched data)
 SELECT admin_level, COUNT(*)
 FROM admin_boundaries
 GROUP BY admin_level
@@ -324,32 +318,3 @@ Expected response:
   "wikidata": "Q240"
 }
 ```
-
-## Performance Benchmarks
-
-**Typical import times (Belgium example):**
-
-| Stage | Duration | Notes |
-|-------|----------|-------|
-| Fetch OSM | ~30 seconds | 584 boundaries |
-| Fetch Wikidata | ~2 minutes | 12 batches, 580 categories |
-| Transform | <1 second | In-memory processing |
-| Database Insert | ~5 seconds | 12 batches |
-| **Total** | **~3 minutes** | Belgium (584 records) |
-
-**Expected scaling:**
-- Small countries (< 100 records): 1-2 minutes
-- Medium countries (100-1000 records): 3-5 minutes
-- Large countries (> 1000 records): 10+ minutes
-
-## Next Steps
-
-After successful import:
-
-1. **Test the API** with various coordinates
-2. **Verify data quality** using the verification queries above
-3. **Document any issues** specific to your country
-4. **Consider improvements:**
-   - Full polygon geometry implementation
-   - Incremental updates for boundary changes
-   - Multiple country imports

@@ -65,6 +65,54 @@ export function enrichWithWikidataData(
 }
 
 /**
+ * Enrich database rows with Wikidata Commons categories
+ */
+export function enrichDatabaseRowsWithWikidata(
+  rows: Array<{
+    id: string
+    wikidata_id: string | null
+    admin_level: number
+    name: string
+    geom: string
+    iso3: string
+  }>,
+  wikidataCategories: Map<string, string>,
+): AdminBoundaryImport[] {
+  console.log('=== Enriching Database Rows with Wikidata Data ===')
+
+  const enriched: AdminBoundaryImport[] = []
+  let skippedCount = 0
+
+  for (const row of rows) {
+    if (!row.wikidata_id) {
+      skippedCount++
+      continue
+    }
+
+    const commonsCategory = wikidataCategories.get(row.wikidata_id)
+
+    if (!commonsCategory) {
+      skippedCount++
+      console.debug(`No Commons category for Wikidata ID ${row.wikidata_id} (${row.name})`)
+      continue
+    }
+
+    enriched.push({
+      wikidata_id: row.wikidata_id,
+      commons_category: commonsCategory,
+      admin_level: row.admin_level,
+      name: row.name,
+      geom: row.geom,
+    })
+  }
+
+  console.log(`Enriched: ${enriched.length} boundaries`)
+  console.log(`Skipped: ${skippedCount} rows (no wikidata_id or Commons category)`)
+
+  return enriched
+}
+
+/**
  * Validate and filter boundaries with invalid geometries
  */
 export function validateGeometries(boundaries: AdminBoundaryImport[]): AdminBoundaryImport[] {
@@ -130,6 +178,28 @@ export function transformBoundaries(
   return pipe(
     osmBoundaries,
     (boundaries) => enrichWithWikidataData(boundaries, wikidataCategories),
+    validateGeometries,
+    deduplicateBoundaries,
+  )
+}
+
+/**
+ * Transform database rows with Wikidata enrichment
+ */
+export function transformDatabaseRows(
+  rows: Array<{
+    id: string
+    wikidata_id: string | null
+    admin_level: number
+    name: string
+    geom: string
+    iso3: string
+  }>,
+  wikidataCategories: Map<string, string>,
+): AdminBoundaryImport[] {
+  return pipe(
+    rows,
+    (dbRows) => enrichDatabaseRowsWithWikidata(dbRows, wikidataCategories),
     validateGeometries,
     deduplicateBoundaries,
   )

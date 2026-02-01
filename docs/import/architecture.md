@@ -14,12 +14,13 @@ graph TB
     subgraph "Import Pipeline"
         ORCHESTRATOR[Main Orchestrator<br/>src/scripts/import/index.ts]
 
-        subgraph "Stage 1: Fetch"
-            OSM[OSM Fetcher<br/>fetch-osm.ts]
+        subgraph "Stage 1: Hierarchical Import"
+            HIER[Hierarchical Import<br/>hierarchical/index.ts]
+            OVERPASS[Overpass API]
         end
 
-        subgraph "Stage 2: Enrich"
-            EXTRACT[ID Extractor]
+        subgraph "Stage 2: Extract & Enrich"
+            EXTRACT[ID Extractor<br/>from osm_relations]
             WIKIDATA[Wikidata Client<br/>wikidata-api.ts]
         end
 
@@ -35,17 +36,19 @@ graph TB
     end
 
     subgraph "External APIs"
-        OVERPASS[Overpass API<br/>OSM Boundaries]
+        OVERPASS_API[Overpass API<br/>Relation Discovery & Geometries]
         WD_API[Wikidata REST API<br/>Commons Categories]
     end
 
     subgraph "Storage"
         POSTGRES[(PostgreSQL<br/>PostGIS)]
+        OSM_REL[(osm_relations<br/>Raw OSM Data)]
+        ADMIN_BND[(admin_boundaries<br/>Enriched API Data)]
         FILES[File System<br/>Intermediate Files]
     end
 
     subgraph "Utilities"
-        EFFECT[Effect Helpers<br/>effect.ts]
+        EFFECT[Effect Helpers<br/>effect-helpers.ts]
         BATCH[Batch Processor<br/>batch.ts]
         LOGGING[Logging<br/>logging.ts]
     end
@@ -53,25 +56,29 @@ graph TB
     ENV --> ORCHESTRATOR
     CONSTANTS --> ORCHESTRATOR
 
-    ORCHESTRATOR --> OSM
-    OSM --> OVERPASS
-    OVERPASS --> OSM
-    OSM --> FILES
+    ORCHESTRATOR --> HIER
+    HIER --> OVERPASS
+    OVERPASS --> OVERPASS_API
+    OVERPASS_API --> OSM_REL
 
     ORCHESTRATOR --> EXTRACT
-    EXTRACT --> WIKIDATA
+    EXTRACT --> OSM_REL
+
+    ORCHESTRATOR --> WIKIDATA
     WIKIDATA --> WD_API
     WD_API --> WIKIDATA
 
     ORCHESTRATOR --> TRANSFORM
     TRANSFORM --> VALIDATE
+    TRANSFORM --> OSM_REL
+    TRANSFORM --> WIKIDATA
 
     ORCHESTRATOR --> DATABASE
-    DATABASE --> POSTGRES
+    DATABASE --> ADMIN_BND
     DATABASE --> VERIFY
     VERIFY --> POSTGRES
 
-    OSM -.-> EFFECT
+    HIER -.-> EFFECT
     WIKIDATA -.-> EFFECT
     DATABASE -.-> EFFECT
 
@@ -81,35 +88,29 @@ graph TB
     ORCHESTRATOR -.-> LOGGING
 ```
 
-## Component Hierarchy
+## Two-Table Architecture
 
 ```mermaid
-graph TD
-    A[Import Orchestrator] --> B[Fetch Stage]
-    A --> C[Enrich Stage]
-    A --> D[Transform Stage]
-    A --> E[Persist Stage]
+graph LR
+    subgraph "Hierarchical Import"
+        A1[Overpass API] --> A2[Discover Relations]
+        A2 --> A3[Fetch Relation IDs]
+        A3 --> A4[Fetch Geometries]
+        A4 --> A5[Store in osm_relations]
+    end
 
-    B --> B1[Build Overpass Query]
-    B --> B2[Execute API Request]
-    B --> B3[Parse Response]
-    B --> B4[Save to File]
+    subgraph "Main Pipeline"
+        A5 --> B1[Extract Wikidata IDs]
+        B1 --> B2[Wikidata API]
+        B2 --> B3[Fetch Categories]
+        B3 --> B4[Transform & Validate]
+        B4 --> B5[Store in admin_boundaries]
+    end
 
-    C --> C1[Extract Wikidata IDs]
-    C --> C2[Process in Batches]
-    C --> C3[Fetch Categories]
-    C --> C4[Build Category Map]
-
-    D --> D1[Merge OSM + Wikidata]
-    D --> D2[Validate Geometries]
-    D --> D3[Remove Duplicates]
-    D --> D4[Convert to EWKT]
-
-    E --> E1[Connect to Database]
-    E --> E2[Batch Transactions]
-    E --> E3[Insert Records]
-    E --> E4[Verify Results]
-
+    subgraph "API Usage"
+        B5 --> C1[Reverse Geocoding]
+        C1 --> C2[/geocode endpoint]
+    end
 ```
 
 ## Module Responsibilities
@@ -126,77 +127,37 @@ graph LR
 
     subgraph "import/"
         INDEX[index.ts<br/>Orchestrator]
-        FETCH[fetch-osm.ts<br/>OSM Fetcher]
+        HIER[hierarchical/<br/>Hierarchical Import]
         TRANSFORM[transform.ts<br/>Transformer]
         DB_DIR[database/<br/>DB Layer]
     end
 
+    subgraph "hierarchical/"
+        H_INDEX[index.ts<br/>Entry Point]
+        FETCH_REL[fetch-relations.ts<br/>Overpass Client]
+        FETCH_GEOM[fetch-geometry.ts<br/>Overpass Client]
+        H_DB[database/<br/>OSM Relations DB]
+    end
+
     subgraph "utils/"
-        EFFECT[effect.ts<br/>Effect Helpers]
+        EFFECT[effect-helpers.ts<br/>Effect Helpers]
         BATCH[batch.ts<br/>Batch Processor]
         WD_API[wikidata-api.ts<br/>Wikidata Client]
         LOG[logging.ts<br/>Logger]
     end
 
     CONST --> INDEX
-    INDEX --> FETCH
+    INDEX --> HIER
     INDEX --> TRANSFORM
     INDEX --> DB_DIR
-    FETCH --> EFFECT
+    HIER --> EFFECT
     DB_DIR --> WD_API
     DB_DIR --> BATCH
     INDEX --> LOG
 
-```
-
-## Configuration Architecture
-
-### Environment Variable Flow
-
-```mermaid
-graph TD
-    ENV[Bun.env] --> VALIDATE{Validation}
-    VALIDATE -->|Missing| ERROR[Error: Required vars missing]
-    VALIDATE -->|Present| PARSE[Parse Types]
-
-    PARSE --> COUNTRY["COUNTRY_CODE: string"]
-    PARSE --> LEVELS["ADMIN_LEVELS: array"]
-    PARSE --> BATCH["BATCH_SIZE: number"]
-    PARSE --> OUTPUT["OUTPUT_DIR: string"]
-    PARSE --> SKIP["SKIP_WIKIDATA: boolean"]
-
-    COUNTRY --> CONFIG[ImportConfig]
-    LEVELS --> CONFIG
-    BATCH --> CONFIG
-    OUTPUT --> CONFIG
-    SKIP --> CONFIG
-
-    CONFIG --> ORCH[Orchestrator]
-
-```
-
-### Constants Configuration
-
-```mermaid
-graph LR
-    subgraph "Internal Constants"
-        RETRY[RETRY_CONFIG<br/>maxAttempts: 3<br/>baseDelayMs: 1000]
-        BATCH_WD[WIKIDATA_BATCH_SIZE<br/>50 IDs]
-        BATCH_DB[DATABASE_BATCH_SIZE<br/>1000 records]
-        DELAY[RATE_LIMIT_DELAY_MS<br/>100ms]
-    end
-
-    subgraph "Usage Locations"
-        OSM[fetch-osm.ts]
-        WD[wikidata-api.ts]
-        DB[database/]
-    end
-
-    RETRY --> OSM
-    RETRY --> WD
-    BATCH_WD --> WD
-    BATCH_DB --> DB
-    DELAY --> WD
+    H_INDEX --> FETCH_REL
+    H_INDEX --> FETCH_GEOM
+    H_INDEX --> H_DB
 ```
 
 ## Database Architecture
@@ -205,7 +166,18 @@ graph LR
 
 ```mermaid
 erDiagram
-    admin_boundaries ||--o| admin_boundaries : "parent-child"
+    osm_relations ||--o| osm_relations : "parent-child"
+    osm_relations {
+        bigint id PK "OSM Relation ID"
+        varchar wikidata_id UK "Q123 format"
+        int admin_level "2-11"
+        varchar name "Display name"
+        geometry geom "PostGIS polygon"
+        varchar iso3 "ISO3 code"
+        bigint parent_id FK "Parent relation"
+        timestamp created_at
+    }
+
     admin_boundaries {
         int id PK
         varchar wikidata_id UK "Q123 format"
@@ -216,15 +188,16 @@ erDiagram
         timestamp created_at
     }
 
-    Note over admin_boundaries
-        PostGIS Extension Enabled
-        GIST Index on geom
-        B-tree Index on wikidata_id
-        B-tree Index on admin_level
+    Note over osm_relations,admin_boundaries
+        osm_relations: Raw OSM data with full geometries
+        admin_boundaries: Enriched data for API
+        Populated by hierarchical import → main pipeline
     end Note
 ```
 
-**Note**: PostGIS Extension Enabled, GIST Index on geom, B-tree Index on wikidata_id and admin_level
+**Indexes**:
+- `osm_relations`: GIST on geom, b-tree on wikidata_id, admin_level, iso3
+- `admin_boundaries`: GIST on geom, b-tree on wikidata_id, admin_level
 
 ### Connection Pool Architecture
 
@@ -257,7 +230,6 @@ graph TB
     CONN_N -->|Return| POOL
 
     POOL -->|Reuse| IMPORT
-
 ```
 
 ## Data Models
@@ -266,13 +238,14 @@ graph TB
 
 ```mermaid
 classDiagram
-    class OSMBoundary {
-        +string wikidata
-        +string name
+    class OSMRelation {
+        +string id
+        +string wikidata_id
         +number admin_level
-        +GeoJSONPolygon geometry
-        +Note: "Bounding box approximation"
-        +GeoJSONProperties tags
+        +string name
+        +string geom EWKT
+        +string iso3
+        +string parent_id
     }
 
     class AdminBoundaryImport {
@@ -284,7 +257,7 @@ classDiagram
     }
 
     class ImportConfig {
-        +string country
+        +string countryCode
         +number[] adminLevels
         +number batchSize
         +string outputDir
@@ -299,45 +272,8 @@ classDiagram
         +number errors
     }
 
-    OSMBoundary --> AdminBoundaryImport : transforms
+    OSMRelation --> AdminBoundaryImport : transforms
     ImportConfig --> ImportStats : produces
-```
-
-### State Management
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle: System initialized
-
-    Idle --> Fetching: Start import
-    Fetching --> Enriching: OSM data received
-    Enriching --> Transforming: Categories fetched
-    Transforming --> Persisting: Data validated
-    Persisting --> Verifying: Batch complete
-    Verifying --> Idle: Import finished
-
-    note right of Fetching
-        Calls Overpass API
-        Saves intermediate file
-    end note
-
-    note right of Enriching
-        Batch processes 50 IDs
-        Rate limited 100ms
-    end note
-
-    note right of Transforming
-        Validates geometries
-        Removes duplicates
-    end note
-
-    note right of Persisting
-        Transaction batches
-        1000 records each
-    end note
-
-    Verifying --> [*] : On success
-    Persisting --> [*] : On error
 ```
 
 ## Execution Models
@@ -346,44 +282,31 @@ stateDiagram-v2
 
 ```mermaid
 graph LR
-    A[Start] --> B[Stage 1: Fetch OSM]
+    A[Start] --> B[Stage 1: Hierarchical Import]
     B --> C[Stage 2: Extract Wikidata IDs]
     C --> D[Stage 3: Fetch Wikidata]
     D --> E[Stage 4: Transform]
     E --> F[Stage 5: Insert DB]
     F --> G[Stage 6: Verify]
     G --> H[End]
-
 ```
 
-### Parallel Batch Processing (Wikidata)
+### Hierarchical Import Flow
 
 ```mermaid
 graph TD
-    INPUT[All Wikidata IDs] --> SPLIT[Split into Batches<br/>50 IDs each]
+    START[Start Hierarchical Import] --> INIT[Initialize Progress]
 
-    SPLIT --> B1[Batch 1]
-    SPLIT --> B2[Batch 2]
-    SPLIT --> B3[Batch 3]
-    SPLIT --> BN[Batch N]
+    INIT --> FETCH_REL[Fetch Relation IDs<br/>from Overpass]
+    FETCH_REL --> LOOP_REL{For Each Admin Level}
 
-    B1 --> API1[Fetch from API]
-    B2 --> API2[Fetch from API]
-    B3 --> API3[Fetch from API]
-    BN --> APIN[Fetch from API]
+    LOOP_REL --> FETCH_GEOM[Fetch Geometries<br/>from Overpass]
+    FETCH_GEOM --> STORE[Store in osm_relations]
+    STORE --> UPDATE[Update Progress]
+    UPDATE --> LOOP_REL
 
-    API1 --> DELAY1[Wait 100ms]
-    API2 --> DELAY2[Wait 100ms]
-    API3 --> DELAY3[Wait 100ms]
-    APIN --> DELAYN[Wait 100ms]
-
-    DELAY1 --> MERGE[Merge Results]
-    DELAY2 --> MERGE
-    DELAY3 --> MERGE
-    DELAYN --> MERGE
-
-    MERGE --> OUTPUT[Category Map]
-
+    LOOP_REL --> COMPLETE[Mark Complete]
+    COMPLETE --> END[End]
 ```
 
 ## Technology Stack
@@ -401,7 +324,7 @@ graph TB
     end
 
     subgraph "APIs"
-        OVERPASS_API[Overpass API<br/>OSM data]
+        OVERPASS_API[Overpass API<br/>Relation discovery & geometries]
         WIKIDATA_API[Wikidata REST API<br/>Categories]
     end
 
@@ -419,5 +342,4 @@ graph TB
 
     PG --> POSTGRES_DB
     POSTGRES_DB --> POSTGIS
-
 ```

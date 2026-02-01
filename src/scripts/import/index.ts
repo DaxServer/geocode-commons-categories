@@ -2,23 +2,19 @@
  * Main import orchestrator - coordinates the entire import pipeline
  */
 
-import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Effect } from 'effect'
+import { getAdminLevelRange } from '@/scripts/constants'
 import { tryAsync } from '@/scripts/utils/effect-helpers'
 import { logSection } from '@/scripts/utils/logging'
 import { fetchWikimediaCategoriesBatch } from '@/scripts/utils/wikidata-api'
-import type {
-  AdminBoundaryImport,
-  ImportConfig,
-  ImportStats,
-  OSMBoundary,
-} from '@/types/import.types'
+import type { AdminBoundaryImport, ImportConfig, ImportStats } from '@/types/import.types'
 import { batchInsertBoundaries } from './database'
 import { closePool } from './database/connection'
+import { getOSMRelationsForTransform, getOSMRelationsForWikidata } from './database/queries'
 import { verifyImport } from './database/verification'
-import { fetchOSMData } from './fetch-osm'
-import { transformBoundaries } from './transform'
+import { importSingleCountry } from './hierarchical'
+import { transformDatabaseRows } from './transform'
 
 function displayConfig(config: ImportConfig): void {
   console.log('╔════════════════════════════════════════════════════════════╗')
@@ -33,23 +29,14 @@ function displayConfig(config: ImportConfig): void {
   console.log()
 }
 
-function setupOutputDirectory(config: ImportConfig): Effect.Effect<void, Error, never> {
-  return Effect.gen(function* () {
-    if (config.outputDir) {
-      yield* tryAsync(async () => await mkdir(config.outputDir, { recursive: true }))
-    }
-  })
-}
-
-function extractWikidataIds(boundaries: OSMBoundary[]): string[] {
-  return boundaries
-    .map((b) => b.tags?.['wikidata'])
-    .filter((id): id is string => id !== undefined)
-    .map((id) => id.replace('http://www.wikidata.org/entity/', ''))
+function extractWikidataIds(rows: Array<{ wikidata_id: string | null }>): string[] {
+  return rows
+    .map((r) => r.wikidata_id)
+    .filter((id): id is string => id !== undefined && id !== null)
 }
 
 function fetchWikidataCategoriesIfNeeded(
-  boundaries: OSMBoundary[],
+  countryCode: string | undefined,
   skip: boolean,
 ): Effect.Effect<Map<string, string>, Error, never> {
   return Effect.gen(function* () {
@@ -57,10 +44,18 @@ function fetchWikidataCategoriesIfNeeded(
       return new Map()
     }
 
-    logSection('Step 2: Extracting Wikidata IDs from OSM data')
+    logSection('Step 2: Extracting Wikidata IDs from OSM relations')
 
-    const wikidataIds = extractWikidataIds(boundaries)
-    console.log(`Found ${wikidataIds.length} unique Wikidata IDs in OSM data`)
+    const rows = yield* getOSMRelationsForWikidata(countryCode)
+    console.log(`Found ${rows.length} OSM relations with Wikidata IDs`)
+
+    const wikidataIds = extractWikidataIds(rows)
+    console.log(`Extracted ${wikidataIds.length} unique Wikidata IDs`)
+
+    if (wikidataIds.length === 0) {
+      console.warn('No Wikidata IDs found in OSM relations')
+      return new Map()
+    }
 
     logSection('Step 3: Fetching Commons categories from Wikidata')
     const categories = yield* fetchWikimediaCategoriesBatch(wikidataIds)
@@ -102,7 +97,7 @@ function displaySummary(
   console.log('╔════════════════════════════════════════════════════════════╗')
   console.log('║                      Import Summary                        ║')
   console.log('╚════════════════════════════════════════════════════════════╝')
-  console.log(`OSM boundaries fetched:    ${osmCount}`)
+  console.log(`OSM relations imported:    ${osmCount}`)
   console.log(`Wikidata IDs found:       ${wikidataCount}`)
   console.log(`Matched records:          ${transformedCount}`)
   console.log(`Successfully inserted:     ${stats.insertedRecords}`)
@@ -116,23 +111,37 @@ function displaySummary(
 export const runImport = (config: ImportConfig): Effect.Effect<void, Error, never> => {
   return Effect.gen(function* () {
     displayConfig(config)
-    yield* setupOutputDirectory(config)
 
-    logSection('Step 1: Fetching OSM boundary data')
-    const osmBoundaries = yield* fetchOSMData(config)
+    const adminLevelRange = getAdminLevelRange()
+    const countryCode = config.countryCode
 
-    if (osmBoundaries.length === 0) {
-      console.error('No OSM boundaries fetched. Aborting import.')
+    if (!countryCode) {
+      console.error('COUNTRY_CODE environment variable is required')
       return
     }
 
+    // Step 1: Run hierarchical import to fetch OSM data
+    logSection('Step 1: Fetching OSM data via hierarchical import')
+    yield* importSingleCountry(countryCode, adminLevelRange)
+
+    // Step 2 & 3: Fetch Wikidata categories
     const wikidataCategories = yield* fetchWikidataCategoriesIfNeeded(
-      osmBoundaries,
+      countryCode,
       config.skipWikidata,
     )
 
+    // Step 4: Get OSM relations from database and transform
     logSection('Step 4: Transforming and enriching data')
-    const transformedBoundaries = transformBoundaries(osmBoundaries, wikidataCategories)
+    const osmRelations = yield* getOSMRelationsForTransform(countryCode)
+
+    if (osmRelations.length === 0) {
+      console.error('No OSM relations found in database. Aborting import.')
+      return
+    }
+
+    console.log(`Found ${osmRelations.length} OSM relations in database`)
+
+    const transformedBoundaries = transformDatabaseRows(osmRelations, wikidataCategories)
 
     if (transformedBoundaries.length === 0) {
       console.error('No transformed boundaries. Aborting import.')
@@ -141,12 +150,13 @@ export const runImport = (config: ImportConfig): Effect.Effect<void, Error, neve
 
     yield* saveTransformedData(transformedBoundaries, config)
 
-    logSection('Step 5: Inserting data into database')
+    // Step 5: Insert to admin_boundaries table
+    logSection('Step 5: Inserting data into admin_boundaries table')
     const stats = yield* batchInsertBoundaries(transformedBoundaries, config.batchSize)
 
     displaySummary(
       stats,
-      osmBoundaries.length,
+      osmRelations.length,
       wikidataCategories.size,
       transformedBoundaries.length,
     )
