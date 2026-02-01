@@ -52,15 +52,15 @@ export function fetchWithRetry(options: RequestOptions): Effect.Effect<unknown, 
       const res = response.right
 
       if (!res.ok) {
-        const isRetryableServerError =
+        const isRetryableStatus =
+          res.status === 429 ||
           RETRYABLE_SERVER_ERRORS.includes(
             res.status as (typeof RETRYABLE_SERVER_ERRORS)[number],
-          ) && attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1
-        const isRateLimit = res.status === 429 && attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1
+          )
 
-        if (isRetryableServerError || isRateLimit) {
+        if (isRetryableStatus && attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
           const delay = baseDelayMs * 2 ** attempt
-          const errorType = isRetryableServerError ? 'server error' : 'rate limited'
+          const errorType = res.status === 429 ? 'rate limited' : 'server error'
           console.warn(`Overpass API ${errorType} (${res.status}), retrying in ${delay}ms...`)
           yield* Effect.sleep(`${delay} millis`)
           continue
