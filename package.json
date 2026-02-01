@@ -13,8 +13,7 @@
     "import:data": "bun src/scripts/import/index.ts",
     "import:osm": "bun src/scripts/import/fetch-osm.ts",
     "import:database": "bun src/scripts/import/database.ts",
-    "import:hierarchical": "bun src/scripts/import/hierarchical/index.ts",
-    "import:hierarchical:country": "bun src/scripts/import/hierarchical/single-country.ts"
+    "import:hierarchical": "bun src/scripts/import/hierarchical/index.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.13",
