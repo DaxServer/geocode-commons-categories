@@ -17,8 +17,16 @@ export const DELAYS = {
 } as const
 
 export const HIERARCHICAL_IMPORT = {
-  MIN_ADMIN_LEVEL: 2,
-  MAX_ADMIN_LEVEL: 11,
   COUNTRY_BATCH_SIZE: 5,
   OVERPASS_TIMEOUT: 90,
 } as const
+
+/**
+ * Get admin level range from environment variables
+ */
+export function getAdminLevelRange(): { min: number; max: number } {
+  const min = parseInt(Bun.env.ADMIN_LEVEL_START, 10)
+  const max = parseInt(Bun.env.ADMIN_LEVEL_END, 10)
+
+  return { min, max }
+}
