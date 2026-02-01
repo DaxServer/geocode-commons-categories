@@ -1,435 +1,275 @@
 # Data Flow Documentation
 
-Complete data flow diagrams, sequence diagrams, and state transitions for the import pipeline.
+Data flow diagrams for the import pipeline showing how data moves through each stage.
 
-## Complete Data Flow Overview
+## Complete Pipeline Flow
 
 ```mermaid
 graph TB
-    subgraph "Stage 1: Hierarchical Import (→ osm_relations)"
-        A1[Start Import] --> A2[Build Overpass Query]
-        A2 --> A3[Discover Relations<br/>by admin_level]
-        A3 --> A4{Has Relations?}
-        A4 -->|No| A5[Skip Level]
-        A4 -->|Yes| A5[Build Overpass Geometry Query]
-        A5 --> A6[POST Overpass API<br/>out geom;]
-        A7 --> A8[Parse Geometries]
-        A8 --> A9["Build OSMRelation array"]
-        A9 --> A10["Insert to osm_relations"]
-        A10 --> A11{More Levels?}
-        A11 -->|Yes| A2
-        A11 -->|No| A12[Complete Hierarchical Import]
+    START[Start Import] --> S1[Stage 1: Fetch OSM]
+
+    subgraph "Stage 1: Fetch OSM Data"
+        S1_1[Discover Relations by Admin Level]
+        S1_2[Fetch Child Relations Hierarchically]
+        S1_3[Fetch Full Geometries]
+        S1_4[Store in osm_relations]
     end
+
+    S1_4 --> S2[Stage 2: Extract Wikidata IDs]
 
     subgraph "Stage 2: Extract Wikidata IDs"
-        A12 --> B1[Query osm_relations]
-        B1 --> B2[Extract wikidata_id column]
-        B2 --> B3[Filter NULL values]
-        B3 --> B4[Count unique IDs]
-        B4 --> B5{Has IDs?}
-        B5 -->|No| B6[Skip Wikidata Stage]
-        B5 -->|Yes| B7[Pass to Stage 3]
+        S2_1[Query osm_relations Table]
+        S2_2[Filter NULL Values]
+        S2_3[Return Unique ID Array]
     end
+
+    S2_3 --> S3[Stage 3: Fetch Wikidata Categories]
 
     subgraph "Stage 3: Fetch Wikidata Categories"
-        B7 --> C1[Split into Batches of 50]
-        C1 --> C2[For Each Batch]
-        C2 --> C3[GET Wikidata API]
-        C3 --> C4[Extract P373 Property]
-        C4 --> C5[Add to Category Map]
-        C5 --> C6{More Batches?}
-        C6 -->|Yes| C7[Wait 100ms]
-        C7 --> C2
-        C6 -->|No| C8[Complete Category Map]
+        S3_1[Split into Batches of 50]
+        S3_2[Fetch via wbgetentities API]
+        S3_3[Extract P373 Property]
+        S3_4[Build Category Map]
     end
 
-    subgraph "Stage 4: Transform"
-        B6 --> D1[Query osm_relations<br/>with geometry]
-        C8 --> D1
-        D1 --> D2[For Each Relation]
-        D2 --> D3{Has Wikidata?}
-        D3 -->|No| D4[Skip Record]
-        D3 -->|Yes| D5{Has Category?}
-        D5 -->|No| D4
-        D5 -->|Yes| D6[Validate Geometry]
-        D6 --> D7{Valid?}
-        D7 -->|No| D4
-        D7 -->|Yes| D8[Verify EWKT Format]
-        D8 --> D9[Add to Results]
-        D9 --> D10{More Records?}
-        D10 -->|Yes| D2
-        D10 -->|No| D11[Remove Duplicates]
-        D11 --> D12[Final Dataset]
+    S3_4 --> S4[Stage 4: Transform and Enrich]
+
+    subgraph "Stage 4: Transform and Enrich"
+        S4_1[Merge OSM + Wikidata Data]
+        S4_2[Validate Geometries]
+        S4_3[Remove Duplicates]
+        S4_4[Filter Missing Categories]
     end
+
+    S4_4 --> S5[Stage 5: Database Insert]
 
     subgraph "Stage 5: Database Insert"
-        D12 --> E1[Connect to PostgreSQL]
-        E1 --> E2[Split into Batches of 1000]
-        E2 --> E3[For Each Batch]
-        E3 --> E4[Begin Transaction]
-        E4 --> E5[Insert Records<br/>ON CONFLICT DO UPDATE]
-        E5 --> E6{Success?}
-        E6 -->|Yes| E7[Commit Transaction]
-        E6 -->|No| E8[Rollback]
-        E8 --> E9[Log Error]
-        E7 --> E10{More Batches?}
-        E10 -->|Yes| E3
-        E10 -->|No| E11[Close Connection]
+        S5_1[Split into Batches of 1000]
+        S5_2[Insert with ON CONFLICT]
+        S5_3[Commit Transaction]
     end
+
+    S5_3 --> S6[Stage 6: Verification]
 
     subgraph "Stage 6: Verification"
-        E11 --> F1[Query Total Count]
-        F1 --> F2[Group by Admin Level]
-        F2 --> F3[Check for NULLs]
-        F3 --> F4[Validate Geometries]
-        F4 --> F5[Display Statistics]
-        F5 --> F6[Import Complete]
+        S6_1[Query Total Count]
+        S6_2[Group by Admin Level]
+        S6_3[Validate Geometries]
     end
+
+    S6_3 --> COMPLETE[Import Complete]
 ```
 
-## Sequence Diagrams
-
-### Main Import Pipeline Sequence
+## OSM Fetch Sequence (Stage 1)
 
 ```mermaid
 sequenceDiagram
     participant CLI as CLI
-    participant Orch as Orchestrator
-    participant Hier as Hierarchical Import
+    participant Import as import.ts
     participant Overpass as Overpass API
-    participant WD as Wikidata Client
-    participant Wikidata as Wikidata API
-    participant Transform as Transformer
-    participant DB as Database Layer
-    participant PG as PostgreSQL
+    participant DB as osm_relations Table
 
-    CLI->>Orch: importData(config)
-    activate Orch
+    CLI->>Import: bun import (COUNTRY_CODE=BEL)
+    activate Import
 
-    Note over Orch,Hier: Stage 1: Hierarchical Import
-    Orch->>Hier: importSingleCountry(iso3, adminLevelRange)
-    activate Hier
+    Note over Import: Level 4: Country Relations
+    Import->>Overpass: POST (buildCountryLevelQuery)
+    Note over Overpass: relation["boundary"="administrative"]<br/>["admin_level"="4"]<br/>["ISO3166-1:alpha3"="BEL"]
+    Overpass-->>Import: Relation IDs [123, 456, 789]
+
+    Import->>Overpass: POST (buildGeometryQuery)
+    Note over Overpass: relation(id:123,456,789)<br/>way(r)<br/>out geom
+    Overpass-->>Import: GeoJSON Polygons
+
+    Import->>DB: INSERT INTO osm_relations
+    Note over DB: id, wikidata_id, admin_level,<br/>name, geom, iso3
 
     loop For each admin level
-        Hier->>Overpass: POST /api/interpreter (discover relations)
-        Overpass-->>Hier: Relation IDs
-        Hier->>Overpass: POST /api/interpreter (out geom;)
-        Overpass-->>Hier: Geometries
-        Hier->>Hier: Build OSMRelation[]
-        Hier->>PG: INSERT INTO osm_relations
-        PG-->>Hier: Result
+        Import->>Import: Use previous level as parent search area
+        Import->>Overpass: POST (buildChildQuery)
+        Note over Overpass: relation(admin_level=N)<br/>(area:3600000000+parentId)
+        Overpass-->>Import: Child Relation IDs
     end
 
-    Hier-->>Orch: Complete
-    deactivate Hier
+    Import-->>CLI: OSM fetch complete
+    deactivate Import
+```
 
-    Note over Orch: Stage 2: Extract Wikidata IDs
-    Orch->>PG: SELECT wikidata_id FROM osm_relations
-    PG-->>Orch: wikidata_id[]
+## Wikidata Fetch Sequence (Stage 3)
 
-    Note over Orch,Wikidata: Stage 3: Fetch Wikidata Categories
+```mermaid
+sequenceDiagram
+    participant Orch as Orchestrator
+    participant WD as wikidata-api.ts
+    participant API as Wikidata API
+    participant Map as Category Map
+
     Orch->>WD: fetchWikimediaCategoriesBatch(ids)
     activate WD
+
+    WD->>WD: Deduplicate IDs (3000 → 2500 unique)
+
     loop For each batch of 50 IDs
-        WD->>Wikidata: GET /w/api.php (wbgetentities)
-        Wikidata-->>WD: Entity data with P373
-        WD->>WD: Extract Commons category
+        WD->>API: GET /w/api.php
+        Note over API: action=wbgetentities<br/>ids=Q1|Q2|...|Q50<br/>props=claims
+
+        API-->>WD: JSON Response
+        Note over WD: entities: {<br/>  Q123: {claims: {P373: [...]}},<br/>  Q456: {claims: {P373: [...]}}<br/>}
+
+        WD->>WD: Extract P373 values
+        WD->>Map: Add entries ("Q123" → "Category:Paris")
+
         WD->>WD: Wait 100ms (rate limit)
     end
-    WD-->>Orch: Map<string, string>
+
+    WD-->>Orch: Map<string, string> (2000 entries)
     deactivate WD
-
-    Note over Orch,Transform: Stage 4: Transform Data
-    Orch->>PG: SELECT * FROM osm_relations WITH geom
-    PG-->>Orch: OSMRelation[]
-    Orch->>Transform: transformDatabaseRows(relations, categories)
-    activate Transform
-    loop For each relation
-        Transform->>Transform: Match Wikidata category
-        Transform->>Transform: Validate geometry
-    end
-    Transform->>Transform: Remove duplicates
-    Transform-->>Orch: AdminBoundaryImport[]
-    deactivate Transform
-
-    Note over Orch,DB: Stage 5: Insert to Database
-    Orch->>DB: batchInsertBoundaries(data)
-    activate DB
-    loop For each batch of 1000 records
-        DB->>PG: BEGIN TRANSACTION
-        DB->>PG: INSERT INTO admin_boundaries
-        PG-->>DB: Result
-        DB->>PG: COMMIT
-    end
-    DB-->>Orch: Import result
-    deactivate DB
-
-    Note over Orch,PG: Stage 6: Verification
-    Orch->>PG: SELECT COUNT(*)
-    PG-->>Orch: Total count
-    Orch->>CLI: Display statistics
-    deactivate Orch
 ```
 
-### Hierarchical Import Sequence
-
-```mermaid
-sequenceDiagram
-    participant Script as Import Script
-    participant Hier as Hierarchical Import
-    participant Overpass as Overpass API
-    participant PG as PostgreSQL
-
-    Script->>Hier: importSingleCountry(iso3, adminLevelRange)
-    activate Hier
-
-    Hier->>PG: Initialize progress tracking
-    PG-->>Hier: Ready
-
-    loop For each admin level
-        Hier->>Overpass: POST /api/interpreter (discover relations)
-        activate Overpass
-        Overpass-->>Hier: Relation IDs[]
-        deactivate Overpass
-
-        alt No relations at this level
-            Hier->>Hier: Continue to next level
-        else Has relations
-            loop For each batch of IDs
-                Hier->>Overpass: POST /api/interpreter
-                activate Overpass
-                Note over Hier,Overpass: out geom; for full geometry
-                Overpass-->>Hier: GeoJSON geometries
-                deactivate Overpass
-
-                Hier->>Hier: Parse and convert to OSMRelation
-                Hier->>PG: INSERT INTO osm_relations
-                PG-->>Hier: Insert result
-            end
-
-            Hier->>PG: Update progress
-        end
-    end
-
-    Hier->>PG: Mark as completed
-    Hier-->>Script: Complete
-    deactivate Hier
-```
-
-### Transform and Validation Sequence
+## Transform Sequence (Stage 4)
 
 ```mermaid
 sequenceDiagram
     participant Orch as Orchestrator
-    participant Transform as Transformer
-    participant DB as Database (osm_relations)
-    participant Wiki as Category Map
-    participant Valid as Validator
-    participant Result as Final Dataset
+    participant DB as osm_relations
+    participant Transform as transform.ts
+    participant Categories as Category Map
+    participant Result as AdminBoundaryImport[]
 
-    Orch->>Transform: transformDatabaseRows(relations, categories)
+    Orch->>DB: SELECT * FROM osm_relations WHERE geom IS NOT NULL
+    DB-->>Orch: 3000 rows
+
+    Orch->>Transform: transformDatabaseRows(rows, categories)
     activate Transform
 
-    Transform->>DB: Get relations with geometry
-    activate DB
-    DB-->>Transform: {wikidata_id, name, admin_level, geom, iso3}
-    deactivate DB
-
-    Transform->>Result: Initialize empty array
-
-    loop For each relation
-        Transform->>Transform: Check for wikidata_id
+    loop For each row
+        Transform->>Transform: Check wikidata_id
         alt No wikidata_id
-            Transform->>Transform: Skip (log warning)
+            Transform->>Transform: Skip row
         else Has wikidata_id
-            Transform->>Wiki: Lookup category
-            activate Wiki
-            Wiki-->>Transform: category name or undefined
-            deactivate Wiki
+            Transform->>Categories: Get(category)
+            Categories-->>Transform: "Category:Name" or undefined
 
-            alt No category found
-                Transform->>Transform: Skip (log warning)
-            else Category found
-                Transform->>Valid: Validate geometry EWKT format
-                activate Valid
-
-                Valid->>Valid: Check EWKT prefix
-                Valid->>Valid: Validate polygon structure
-                Valid-->>Transform: Valid EWKT geometry
-                deactivate Valid
+            alt No category
+                Transform->>Transform: Skip row
+            else Has category
+                Transform->>Transform: Validate EWKT format
+                Transform->>Transform: Check polygon structure
 
                 alt Invalid geometry
-                    Transform->>Transform: Skip (log error)
+                    Transform->>Transform: Skip row
                 else Valid geometry
                     Transform->>Result: Add AdminBoundaryImport
-                    Note over Result: wikidata_id,<br/>commons_category,<br/>admin_level,<br/>name, geom (EWKT)
                 end
             end
         end
     end
 
-    Transform->>Result: Remove duplicates
-    Note over Result: Deduplicate by wikidata_id<br/>Keep first occurrence
-
-    Transform-->>Orch: AdminBoundaryImport[]
+    Transform->>Result: Remove duplicates (by wikidata_id)
+    Transform-->>Orch: 2500 AdminBoundaryImport[]
     deactivate Transform
 ```
 
-## State Diagrams
-
-### Import Process State Machine
+## Database Insert Sequence (Stage 5)
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Initializing: Load config
+sequenceDiagram
+    participant Orch as Orchestrator
+    participant DB as database/insert.ts
+    participant PG as PostgreSQL
 
-    Initializing --> HierarchicalImport: Config validated
+    Orch->>DB: batchInsertBoundaries(boundaries, 1000)
+    activate DB
 
-    state HierarchicalImport {
-        [*] --> DiscoverRelations
-        DiscoverRelations --> CheckRelations
-        CheckRelations --> FetchGeometries: Has relations
-        CheckRelations --> [*]: No relations, skip level
-        FetchGeometries --> StoreRelations
-        StoreRelations --> UpdateProgress
-        UpdateProgress --> DiscoverRelations: More levels?
-        UpdateProgress --> [*]: All levels done
-    }
+    DB->>DB: Split into 3 batches (2950 records)
 
-    HierarchicalImport --> ExtractingIDs: Complete
+    loop For each batch
+        DB->>PG: BEGIN TRANSACTION
 
-    state ExtractingIDs {
-        [*] --> QueryDatabase
-        QueryDatabase --> ExtractIDs
-        ExtractIDs --> FilterNulls
-        FilterNulls --> [*]
-    }
+        loop For each record
+            DB->>PG: INSERT INTO admin_boundaries
+            Note over PG: ON CONFLICT (wikidata_id) DO UPDATE<br/>SET commons_category, admin_level,<br/>name, geom
+        end
 
-    ExtractingIDs --> FetchingWikidata: Has IDs
-    ExtractingIDs --> SkippingWikidata: No IDs or SKIP_WIKIDATA
+        alt Success
+            DB->>PG: COMMIT
+            Note over DB: Batch committed: 1000 records
+        else Error
+            DB->>PG: ROLLBACK
+            Note over DB: Batch failed, logging error
+        end
+    end
 
-    state FetchingWikidata {
-        [*] --> CreateBatches
-        CreateBatches --> ProcessingBatches
-
-        ProcessingBatches --> FetchBatch: Next batch
-        FetchBatch --> ExtractCategories
-        ExtractCategories --> RateLimitDelay
-        RateLimitDelay --> ProcessingBatches: More batches?
-        ProcessingBatches --> [*]: All batches done
-    }
-
-    state SkippingWikidata {
-        [*] --> LogSkip
-        LogSkip --> [*]
-    }
-
-    SkippingWikidata --> Transforming
-    FetchingWikidata --> Transforming
-
-    state Transforming {
-        [*] --> QueryRelations
-        QueryRelations --> ProcessingRecords
-        ProcessingRecords --> ValidateRecord: Next record
-        ValidateRecord --> Enriching
-        Enriching --> CheckingGeometry
-        CheckingGeometry --> ProcessingRecords: More records?
-        ProcessingRecords --> Deduplicating
-        Deduplicating --> [*]
-    }
-
-    Transforming --> InsertingDatabase
-
-    state InsertingDatabase {
-        [*] --> CreatingBatches
-        CreatingBatches --> ProcessingBatch: Next batch
-        ProcessingBatch --> BeginTransaction
-        BeginTransaction --> InsertingRecords
-        InsertingRecords --> Committing
-        Committing --> ProcessingBatch: More batches?
-        ProcessingBatch --> [*]: All done
-    }
-
-    InsertingDatabase --> Verifying
-
-    state Verifying {
-        [*] --> CountingRecords
-        CountingRecords --> GroupingByLevel
-        GroupingByLevel --> CheckingNulls
-        CheckingNulls --> ValidatingGeometries
-        ValidatingGeometries --> [*]
-    }
-
-    Verifying --> [*]: Complete
-
-    Initializing --> [*]: Config error
-    HierarchicalImport --> [*]: API failure
-    InsertingDatabase --> [*]: Database error
+    DB-->>Orch: {inserted: 2950, errors: []}
+    deactivate DB
 ```
 
-## Filter and Decision Flows
-
-### Record Filtering Logic
+## Verification Sequence (Stage 6)
 
 ```mermaid
-graph TD
-    START[Process OSM Relation] --> CHECK_WD{Has wikidata_id?}
+sequenceDiagram
+    participant Orch as Orchestrator
+    participant Verify as verification.ts
+    participant PG as PostgreSQL
 
-    CHECK_WD -->|No| SKIP1[❌ Skip: No Wikidata ID]
-    CHECK_WD -->|Yes| CHECK_CAT{Has Commons<br/>category?}
+    Orch->>Verify: verifyImport()
+    activate Verify
 
-    CHECK_CAT -->|No| SKIP2[❌ Skip: No category]
-    CHECK_CAT -->|Yes| CHECK_GEOM{Valid<br/>geometry?}
+    Verify->>PG: SELECT COUNT(*) FROM admin_boundaries
+    PG-->>Verify: 2950
 
-    CHECK_GEOM -->|No| SKIP3[❌ Skip: Invalid geometry]
-    CHECK_GEOM -->|Yes| CHECK_DUP{Duplicate<br/>wikidata_id?}
+    Verify->>PG: SELECT admin_level, COUNT(*) FROM admin_boundaries GROUP BY admin_level
+    PG-->>Verify: [{level:4, count:50}, {level:6, count:300}, {level:8, count:2600}]
 
-    CHECK_DUP -->|Yes| SKIP4[❌ Skip: Duplicate]
-    CHECK_DUP -->|No| SUCCESS[✓ Include in import]
+    Verify->>PG: SELECT COUNT(*) FROM admin_boundaries WHERE geom IS NULL
+    PG-->>Verify: 0
 
-    SKIP1 --> LOG1[Log: Missing wikidata_id]
-    SKIP2 --> LOG2[Log: No category found]
-    SKIP3 --> LOG3[Log: Invalid geometry]
-    SKIP4 --> LOG4[Log: Duplicate entry]
+    Verify->>PG: SELECT COUNT(*) FROM admin_boundaries WHERE NOT ST_IsValid(geom)
+    PG-->>Verify: 0
 
-    LOG1 --> END[End of record processing]
-    LOG2 --> END
-    LOG3 --> END
-    LOG4 --> END
-
-    SUCCESS --> IMPORT[Add to import batch]
+    Verify-->>Orch: Display summary statistics
+    deactivate Verify
 ```
 
-### Batch Processing Flow
+## Data Volume Flow
 
 ```mermaid
-graph TD
-    START[Start Batch Processing] --> SIZE{Determine<br/>Batch Size}
+graph LR
+    OSM[OSM Fetch<br/>3000 relations] --> WD[Wikidata IDs<br/>3000 unique Q IDs]
 
-    SIZE -->|Wikidata API| BATCH_WD[50 IDs]
-    SIZE -->|Database| BATCH_DB[1000 records]
+    WD --> WD_CATS[Categories Fetched<br/>2500 matched]
 
-    BATCH_WD --> SPLIT_WD[Split into chunks]
-    BATCH_DB --> SPLIT_DB[Split into chunks]
+    WD_CATS --> VALID[Validated<br/>2450 pass]
 
-    SPLIT_WD --> LOOP_WD[For each chunk]
-    SPLIT_DB --> LOOP_DB[For each chunk]
+    VALID --> DEDUP[Deduplicated<br/>2450 unique]
 
-    LOOP_WD --> PROCESS_WD[Process batch]
-    LOOP_DB --> PROCESS_DB[Process batch]
+    DEDUP --> FINAL[admin_boundaries<br/>2450 inserted]
 
-    PROCESS_WD --> DELAY_WD[Wait 100ms]
-    PROCESS_DB --> NO_DELAY[No delay]
+    classDef skip fill:#f88,stroke:#f00,color:#000
+    class osmSkip,wdSkip,validSkip skip
 
-    DELAY_WD --> MORE_WD{More chunks?}
-    NO_DELAY --> MORE_DB{More chunks?}
+    OSM -.->|Skipped: 0| osmSkip
+    WD -.->|Unmatched: 500| wdSkip
+    VALID -.->|Invalid: 0| validSkip
+```
 
-    MORE_WD -->|Yes| LOOP_WD
-    MORE_DB -->|Yes| LOOP_DB
+## Import Commands Flow
 
-    MORE_WD -->|No| COMPLETE_WD[Complete]
-    MORE_DB -->|No| COMPLETE_DB[Complete]
+```mermaid
+graph TB
+    CLI[bun command] --> DECISION{Which command?}
 
-    COMPLETE_WD --> END[End]
-    COMPLETE_DB --> END
+    DECISION -->|bun import| OSM_ONLY[OSM-Only Import]
+    DECISION -->|bun import:data| FULL_PIPELINE[Full Pipeline]
+
+    OSM_ONLY --> S1[Fetch OSM → osm_relations]
+    S1 --> OSM_DONE[Complete: osm_relations populated]
+
+    FULL_PIPELINE --> S1
+    OSM_DONE --> S2[Extract Wikidata IDs]
+    S2 --> S3[Fetch Categories]
+    S3 --> S4[Transform & Enrich]
+    S4 --> S5[Insert to admin_boundaries]
+    S5 --> S6[Verify Results]
+    S6 --> PIPELINE_DONE[Complete: Both tables populated]
 ```

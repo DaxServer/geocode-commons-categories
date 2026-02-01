@@ -246,10 +246,11 @@ Use `continue` not `break` when admin level is empty
 - Allows graceful handling of missing admin levels
 
 ### Overpass API Query Format
-Use `out bb;` for bounding boxes (fast, simple rectangles)
-- Alternative `out geom;` doesn't return geometry for relations
-- Alternative `out body; >; out skel qt;` times out for complex countries (too much data)
-- Trade-off: Bounding boxes may overlap at borders, causing inaccurate matches
+The import system uses `out geom;` to fetch full polygon geometries from Overpass API
+- **Discovery queries** use `out ids;` for fast relation ID lookup (no geometry)
+- **Geometry fetch** uses `out geom;` to fetch complete polygon data
+- This provides accurate boundary representations (not simplified bounding boxes)
+- Trade-off: Full geometries may be slower and may timeout for very large countries
 
 ### API Endpoint
 Reverse geocoding endpoint is `/geocode?lat={lat}&lon={lon}`, not root path

@@ -60,21 +60,27 @@ export function releaseClient(client: pg.PoolClient): Effect.Effect<void, never>
 export const getOSMRelationsForWikidata = (
   countryCode?: string,
 ): Effect.Effect<
-  Array<{ id: string; wikidata_id: string; admin_level: number; name: string; iso3: string }>,
+  Array<{
+    id: string
+    wikidata_id: string
+    admin_level: number
+    name: string
+    country_code: string
+  }>,
   Error
 > => {
   return Effect.gen(function* () {
     const pool = getPool()
 
     let query = `
-      SELECT id, wikidata_id, admin_level, name, iso3
+      SELECT id, wikidata_id, admin_level, name, country_code
       FROM osm_relations
       WHERE wikidata_id IS NOT NULL
     `
     const params: (string | number)[] = []
 
     if (countryCode) {
-      query += ' AND iso3 = $1'
+      query += ' AND country_code = $1'
       params.push(countryCode)
     }
 
@@ -101,7 +107,7 @@ export const getOSMRelationsForTransform = (
     admin_level: number
     name: string
     geom: string
-    iso3: string
+    country_code: string
   }>,
   Error
 > => {
@@ -109,14 +115,14 @@ export const getOSMRelationsForTransform = (
     const pool = getPool()
 
     let query = `
-      SELECT id, wikidata_id, admin_level, name, ST_AsEWKT(geom) as geom, iso3
+      SELECT id, wikidata_id, admin_level, name, ST_AsEWKT(geometry) as geom, country_code
       FROM osm_relations
-      WHERE geom IS NOT NULL
+      WHERE geometry IS NOT NULL
     `
     const params: (string | number)[] = []
 
     if (countryCode) {
-      query += ' AND iso3 = $1'
+      query += ' AND country_code = $1'
       params.push(countryCode)
     }
 
