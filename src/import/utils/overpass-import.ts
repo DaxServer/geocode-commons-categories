@@ -4,10 +4,8 @@
  */
 
 import { Effect } from 'effect'
-import { IMPORT, RETRY_CONFIG } from '@/import/constants'
-import { tryAsync } from '@/import/utils/effect-helpers'
-
-const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
+import { IMPORT } from '@/import/constants'
+import { fetchOverpass } from '@/import/utils/retry'
 
 /**
  * Build query to fetch relation IDs by ISO3166-1:alpha3 tag (for country level only)
@@ -55,51 +53,7 @@ export function buildGeometryQuery(relationIds: number[]): string {
 /**
  * Fetch data from Overpass API with retry logic
  */
-export function fetchOverpass(query: string): Effect.Effect<unknown, Error> {
-  return Effect.gen(function* () {
-    for (let attempt = 0; attempt < RETRY_CONFIG.MAX_ATTEMPTS; attempt++) {
-      const response = yield* Effect.either(
-        tryAsync(async () =>
-          fetch(OVERPASS_API_URL, {
-            method: 'POST',
-            body: query,
-            headers: {
-              'Content-Type': 'text/plain',
-              Accept: 'application/json',
-            },
-          }),
-        ),
-      )
-
-      if (response._tag === 'Left') {
-        if (attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
-          const delay = RETRY_CONFIG.BASE_DELAY_MS * 2 ** attempt
-          console.warn(`Overpass request failed, retrying in ${delay}ms...`, response.left)
-          yield* Effect.sleep(`${delay} millis`)
-          continue
-        }
-        return yield* Effect.fail(response.left)
-      }
-
-      const res = response.right
-
-      if (!res.ok) {
-        if (res.status === 429 && attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
-          const delay = RETRY_CONFIG.BASE_DELAY_MS * 2 ** attempt
-          console.warn(`Rate limited by Overpass API, waiting ${delay}ms...`)
-          yield* Effect.sleep(`${delay} millis`)
-          continue
-        }
-        return yield* Effect.fail(new Error(`Overpass API error: ${res.status} ${res.statusText}`))
-      }
-
-      const data = yield* tryAsync(async () => await res.json())
-      return data
-    }
-
-    return yield* Effect.fail(new Error('Max retries exceeded'))
-  })
-}
+export { fetchOverpass } from '@/import/utils/retry'
 
 /**
  * Fetch relation IDs for a country at a specific admin level (level 2 only - uses ISO3166-1:alpha3 tag)
