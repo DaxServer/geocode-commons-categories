@@ -3,8 +3,8 @@
  */
 
 import { Effect } from 'effect'
-import { BATCH_SIZES, DELAYS } from '@/scripts/constants'
-import { buildGeometryQuery, fetchOverpass } from '@/scripts/utils/overpass-hierarchical'
+import { BATCH_SIZES, DELAYS } from '@/import/constants'
+import { buildGeometryQuery, fetchOverpass } from '@/import/utils/overpass-import'
 import type { ParsedGeometry } from '@/types/import.types'
 
 /**

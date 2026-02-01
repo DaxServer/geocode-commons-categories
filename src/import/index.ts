@@ -4,17 +4,17 @@
 
 import { join } from 'node:path'
 import { Effect } from 'effect'
-import { getAdminLevelRange } from '@/scripts/constants'
-import { tryAsync } from '@/scripts/utils/effect-helpers'
-import { logSection } from '@/scripts/utils/logging'
-import { fetchWikimediaCategoriesBatch } from '@/scripts/utils/wikidata-api'
+import { getAdminLevelRange } from '@/import/constants'
+import { batchInsertBoundaries } from '@/import/database'
+import { closePool } from '@/import/database/connection'
+import { getOSMRelationsForTransform, getOSMRelationsForWikidata } from '@/import/database/queries'
+import { verifyImport } from '@/import/database/verification'
+import { importSingleCountry } from '@/import/import'
+import { transformDatabaseRows } from '@/import/transform'
+import { tryAsync } from '@/import/utils/effect-helpers'
+import { logSection } from '@/import/utils/logging'
+import { fetchWikimediaCategoriesBatch } from '@/import/utils/wikidata-api'
 import type { AdminBoundaryImport, ImportConfig, ImportStats } from '@/types/import.types'
-import { batchInsertBoundaries } from './database'
-import { closePool } from './database/connection'
-import { getOSMRelationsForTransform, getOSMRelationsForWikidata } from './database/queries'
-import { verifyImport } from './database/verification'
-import { importSingleCountry } from './hierarchical'
-import { transformDatabaseRows } from './transform'
 
 function displayConfig(config: ImportConfig): void {
   console.log('╔════════════════════════════════════════════════════════════╗')
@@ -120,8 +120,8 @@ export const runImport = (config: ImportConfig): Effect.Effect<void, Error, neve
       return
     }
 
-    // Step 1: Run hierarchical import to fetch OSM data
-    logSection('Step 1: Fetching OSM data via hierarchical import')
+    // Step 1: Run import to fetch OSM data
+    logSection('Step 1: Fetching OSM data')
     yield* importSingleCountry(countryCode, adminLevelRange)
 
     // Step 2 & 3: Fetch Wikidata categories

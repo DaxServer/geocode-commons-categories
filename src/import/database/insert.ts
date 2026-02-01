@@ -1,11 +1,11 @@
 /**
- * Database insert operations for hierarchical import
+ * Database insert operations for import
  */
 
 import { Effect } from 'effect'
 import type { Pool } from 'pg'
-import { getPool } from '@/scripts/import/database/connection'
-import { tryAsync } from '@/scripts/utils/effect-helpers'
+import { getPool } from '@/import/database/connection'
+import { tryAsync } from '@/import/utils/effect-helpers'
 import type { OSMRelation } from '@/types/import.types'
 
 /**

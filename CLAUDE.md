@@ -29,7 +29,7 @@ bun format:check # Format and lint (applies auto-fixes)
 
 ```bash
 bun import:data         # Run full import pipeline (orchestrator)
-bun import:hierarchical  # Run hierarchical import (fetches OSM data to osm_relations table)
+bun import              # Run OSM data fetch to osm_relations table
 ```
 
 ### Biome Workflow
@@ -51,22 +51,30 @@ src/
 │   ├── errors.ts              # Custom error classes with _tag discriminator
 │   ├── geocode.types.ts       # API schemas and types
 │   └── import.types.ts        # Data import system types
-└── scripts/               # Data import system
+└── import/                # Data import system
     ├── constants.ts           # Import configuration constants
-    ├── import/
-    │   ├── index.ts           # Main orchestrator (uses hierarchical import)
-    │   ├── hierarchical/      # Hierarchical OSM data import system
-    │   │   ├── index.ts       # Hierarchical import entry point
-    │   │   ├── fetch-relations.ts   # Fetch relation IDs from Taginfo
-    │   │   ├── fetch-geometry.ts    # Fetch geometries from Overpass
-    │   │   └── database/      # Database operations for osm_relations table
-    │   ├── transform.ts       # Transform OSM data with Wikidata enrichment
-    │   └── database/          # Batch insert operations for admin_boundaries table
-    └── utils/
-        ├── effect-helpers.ts  # Effect TS helpers (tryAsync, toError)
-        ├── batch.ts           # Batch processing utilities
-        ├── wikidata-api.ts    # Wikidata REST API client
-        └── logging.ts         # Logging utilities
+    ├── import.ts              # OSM data fetch entry point (run import)
+    ├── index.ts               # Main orchestrator (run import:data)
+    ├── database/              # Database operations
+    │   ├── connection.ts       # Database connection pool
+    │   ├── insert.ts           # Insert to osm_relations table
+    │   ├── queries.ts          # All database queries (merged)
+    │   ├── batch.ts            # Batch processing utilities
+    │   ├── verification.ts     # Import verification queries
+    │   └── index.ts            # Batch insert orchestrator
+    ├── fetch/                 # Fetching operations
+    │   ├── relations.ts        # Fetch relation IDs from Overpass
+    │   └── geometry.ts         # Fetch geometries from Overpass
+    ├── transform.ts           # Transform with Wikidata enrichment
+    ├── parent-linking.ts      # Build parent-child relationships
+    └── utils/                 # Shared utilities
+        ├── effect-helpers.ts   # Effect TS helpers (tryAsync)
+        ├── batch.ts            # Batch processing logic
+        ├── wikidata-api.ts     # Wikidata REST API client
+        ├── overpass-import.ts  # Overpass API client for import
+        ├── overpass.ts         # Overpass API client for legacy queries
+        ├── country-codes.ts    # Country code utilities
+        └── logging.ts          # Progress logging
 ```
 
 ## Effect TS Integration
@@ -100,7 +108,7 @@ app.get('/', async ({ query }) => {
 
 ### Effect Utilities
 
-Use helpers from `src/scripts/utils/effect.ts`:
+Use helpers from `src/import/utils/effect-helpers.ts`:
 - `tryAsync(tryFn, context?)` - Wrap async operations with standard error handling
 - `toError(error)` - Convert unknown errors to Error instances
 
@@ -160,6 +168,7 @@ export class DatabaseError extends Error {
 - Access properties on `Record<string, string>` index signatures with bracket notation: `obj['key']` (required by TypeScript strict mode)
 - Biome's `useLiteralKeys` rule is disabled to avoid conflicts with TypeScript index signature requirements
 - **Functional composition preferred** over imperative control flow in business logic
+- **Path aliases required**: All internal imports must use `@/import/...` format, never relative imports like `./file`
 
 ## Data Import Scripts
 
@@ -167,20 +176,20 @@ export class DatabaseError extends Error {
 
 The import system uses a **two-table approach**:
 
-1. **`osm_relations` table**: Stores raw OSM hierarchical data with full geometries
-   - Fetched via hierarchical import system (`import:hierarchical`)
+1. **`osm_relations` table**: Stores raw OSM data with full geometries
+   - Fetched via `bun import` command
    - Uses Overpass API to discover relations and fetch full geometries
    - Stores parent-child relationships between admin levels
 
 2. **`admin_boundaries` table**: Stores enriched data for the main API
-   - Populated by `import:data` orchestrator
+   - Populated by `bun import:data` orchestrator
    - Enriched with Wikimedia Commons categories from Wikidata
    - Used by the reverse geocoding API endpoint
 
 ### Import Pipeline Flow
 
 ```
-Step 1: Hierarchical Import (→ osm_relations)
+Step 1: Import (→ osm_relations)
   └─ Discover and fetch relation IDs from Overpass API
   └─ Fetch full geometries from Overpass API
   └─ Insert to osm_relations table
@@ -207,33 +216,6 @@ Step 6: Verification
   └─ Validate geometries with PostGIS
 ```
 
-### Import Scripts Structure
-
-```
-src/scripts/
-├── constants.ts              # BATCH_SIZE, RATE_LIMIT_MS, admin levels
-├── import/
-│   ├── index.ts              # Main orchestrator (run import:data)
-│   ├── hierarchical/
-│   │   ├── index.ts          # Hierarchical import entry point
-│   │   ├── fetch-relations.ts # Fetch relation IDs from Taginfo
-│   │   ├── fetch-geometry.ts  # Fetch geometries from Overpass
-│   │   ├── database/
-│   │   │   ├── insert.ts     # Insert to osm_relations table
-│   │   │   └── queries.ts    # Query and progress tracking
-│   │   └── parent-linking.ts  # Build parent-child relationships
-│   ├── transform.ts          # Transform with Wikidata enrichment
-│   └── database/
-│       ├── index.ts          # Batch insert to admin_boundaries
-│       ├── connection.ts     # Database connection pool
-│       └── queries.ts        # Database queries
-└── utils/
-    ├── effect-helpers.ts     # Effect TS helpers (tryAsync, toError)
-    ├── batch.ts              # Batch processing logic
-    ├── wikidata-api.ts       # REST API client
-    └── logging.ts            # Progress logging
-```
-
 ### Environment Variables for Import
 
 - `COUNTRY_CODE` - ISO country code (required)
@@ -252,6 +234,16 @@ src/scripts/
 - Wikidata API: Query with "Q240" - receives category data
 - Database: Store as "Q240" - used for lookups
 - Bug pattern: `.replace('Q', '')` breaks the entire pipeline
+
+### Overpass area IDs
+Use `3600000000 + relationId` to convert relation IDs to area IDs for spatial queries
+- Required for fetching child relations within parent boundaries
+- Example: relation 12345 → area ID 3600012345
+
+### Skip logic in import loops
+Use `continue` not `break` when admin level is empty
+- Preserves parent chain for next level search
+- Allows graceful handling of missing admin levels
 
 ### Overpass API Query Format
 Use `out bb;` for bounding boxes (fast, simple rectangles)
@@ -338,15 +330,6 @@ This project uses GitButler CLI (`but`) for all version control operations - **n
 - `but commit -m "message" branch-name` - Add commit to existing branch (stage files first with `but stage`)
 - `but push branch-name` - Push branch to remote
 - `but pr new branch-name -t` - Create PR using commit message for title
-
-## Hierarchical Import System
-
-New import system in `src/scripts/import/hierarchical/` for fetching administrative boundaries at multiple levels:
-- `bun import:hierarchical` - Run hierarchical import (set COUNTRY_CODE for single country)
-- `ADMIN_LEVEL_START` and `ADMIN_LEVEL_END` - Required env vars to specify admin level range
-- **Overpass area IDs**: Use `3600000000 + relationId` to convert relation IDs to area IDs for spatial queries
-- **Skip logic**: Use `continue` not `break` when admin level is empty - preserves parent chain for next level search
-- Two database tables: `osm_relations` (hierarchical import) and `admin_boundaries` (legacy import, used by main API)
 
 ## Working with Temporary Files
 

@@ -1,15 +1,15 @@
 /**
- * Database schema operations for hierarchical import
+ * Database schema operations for import
  *
  * NOTE: Database schema is managed via migrations in the migrations/ directory.
  * The application assumes migrations have been run before importing.
- * Run migrations with: psql -d geocode -f migrations/002_hierarchical_import_schema.sql
+ * Run migrations with: psql -d geocode -f migrations/002_import_schema.sql
  */
 
 import { Effect } from 'effect'
 import type { Pool } from 'pg'
-import { getPool } from '@/scripts/import/database/connection'
-import { tryAsync } from '@/scripts/utils/effect-helpers'
+import { getPool } from '@/import/database/connection'
+import { tryAsync } from '@/import/utils/effect-helpers'
 
 /**
  * Check if a country import is complete

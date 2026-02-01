@@ -10,8 +10,8 @@
     "lint": "bun biome check .",
     "format": "bun biome format --write .",
     "format:check": "bun biome format --write . && bun biome check .",
-    "import:data": "bun src/scripts/import/index.ts",
-    "import:hierarchical": "bun src/scripts/import/hierarchical/index.ts"
+    "import:data": "bun src/import/index.ts",
+    "import": "bun src/import/import.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.13",

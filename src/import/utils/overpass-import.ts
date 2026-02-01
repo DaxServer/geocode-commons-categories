@@ -1,11 +1,11 @@
 /**
- * Overpass API queries for hierarchical administrative boundary import
+ * Overpass API queries for administrative boundary import
  * Uses full polygon geometry (out geom) instead of bounding boxes
  */
 
 import { Effect } from 'effect'
-import { HIERARCHICAL_IMPORT, RETRY_CONFIG } from '@/scripts/constants'
-import { tryAsync } from './effect-helpers'
+import { IMPORT, RETRY_CONFIG } from '@/import/constants'
+import { tryAsync } from '@/import/utils/effect-helpers'
 
 const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
 
@@ -14,7 +14,7 @@ const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
  */
 export function buildCountryLevelQuery(iso3Code: string, adminLevel: number): string {
   return `
-    [out:json][timeout:${HIERARCHICAL_IMPORT.OVERPASS_TIMEOUT}];
+    [out:json][timeout:${IMPORT.OVERPASS_TIMEOUT}];
     (
       relation["boundary"="administrative"]["admin_level"="${adminLevel}"]["ISO3166-1:alpha3"="${iso3Code}"];
     );
@@ -29,7 +29,7 @@ export function buildChildQuery(parentRelationId: number, childLevel: number): s
   // Convert relation ID to area ID (Overpass area IDs for relations are 3600000000 + relationId)
   const areaId = 3600000000 + parentRelationId
   return `
-    [out:json][timeout:${HIERARCHICAL_IMPORT.OVERPASS_TIMEOUT}];
+    [out:json][timeout:${IMPORT.OVERPASS_TIMEOUT}];
     (
       relation["boundary"="administrative"]["admin_level"="${childLevel}"](area:${areaId});
     );
@@ -43,7 +43,7 @@ export function buildChildQuery(parentRelationId: number, childLevel: number): s
 export function buildGeometryQuery(relationIds: number[]): string {
   const idList = relationIds.join(',')
   return `
-    [out:json][timeout:${HIERARCHICAL_IMPORT.OVERPASS_TIMEOUT}];
+    [out:json][timeout:${IMPORT.OVERPASS_TIMEOUT}];
     (
       relation(id:${idList});
       way(r);

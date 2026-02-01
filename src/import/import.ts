@@ -1,22 +1,22 @@
 /**
- * Hierarchical administrative boundary import system
- * Recursively fetches all admin levels (2-11) for all countries
+ * Administrative boundary import system
+ * Fetches all admin levels (2-11) for countries
  */
 
 import { Effect } from 'effect'
-import { batchInsertRelations } from '@/database/insert.ts'
-import { DELAYS, getAdminLevelRange, HIERARCHICAL_IMPORT } from '@/scripts/constants'
-import { batchCountryCodes, getSortedCountryCodes } from '@/scripts/utils/country-codes.ts'
+import { DELAYS, getAdminLevelRange, IMPORT } from '@/import/constants'
+import { batchInsertRelations } from '@/import/database/insert'
 import {
   getCountryStats,
   initializeProgress,
   markCompleted,
   markFailed,
   updateProgress,
-} from './database/queries.ts'
-import { fetchAllGeometry } from './fetch-geometry.ts'
-import { fetchAllRelationIds } from './fetch-relations.ts'
-import { storeRelationsWithParents } from './parent-linking.ts'
+} from '@/import/database/queries'
+import { fetchAllGeometry } from '@/import/fetch/geometry'
+import { fetchAllRelationIds } from '@/import/fetch/relations'
+import { storeRelationsWithParents } from '@/import/parent-linking'
+import { batchCountryCodes, getSortedCountryCodes } from '@/import/utils/country-codes'
 
 /**
  * Import all administrative levels for a single country
@@ -118,7 +118,7 @@ function importCountriesBatch(
  */
 export const importAllCountries = (): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
-    console.log('=== Starting hierarchical import for all countries ===')
+    console.log('=== Starting import for all countries ===')
 
     const allCodes = getSortedCountryCodes()
     console.log(`Importing ${allCodes.length} countries...`)
@@ -127,7 +127,7 @@ export const importAllCountries = (): Effect.Effect<void, Error> => {
     console.log(`Admin level range: ${adminLevelRange.min} to ${adminLevelRange.max}`)
 
     // Process in batches
-    const batches = batchCountryCodes(HIERARCHICAL_IMPORT.COUNTRY_BATCH_SIZE)
+    const batches = batchCountryCodes(IMPORT.COUNTRY_BATCH_SIZE)
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i]
@@ -143,7 +143,7 @@ export const importAllCountries = (): Effect.Effect<void, Error> => {
       }
     }
 
-    console.log('\n=== Hierarchical import complete for all countries ===')
+    console.log('\n=== Import complete for all countries ===')
   })
 }
 
