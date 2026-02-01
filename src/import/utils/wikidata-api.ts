@@ -3,9 +3,9 @@
  */
 
 import { Effect } from 'effect'
-import { BATCH_SIZES, DELAYS } from '@/scripts/constants'
-import { processInBatches } from '@/scripts/utils/batch'
-import { tryAsync } from './effect-helpers'
+import { BATCH_SIZES, DELAYS } from '@/import/constants'
+import { processInBatches } from '@/import/utils/batch'
+import { tryAsync } from '@/import/utils/effect-helpers'
 
 const WIKIDATA_API_ENDPOINT = 'https://www.wikidata.org/w/api.php'
 const USER_AGENT =

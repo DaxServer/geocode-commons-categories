@@ -1,5 +1,5 @@
 /**
- * Geometry conversion utilities for hierarchical import
+ * Geometry conversion utilities for import
  */
 
 import { Effect } from 'effect'

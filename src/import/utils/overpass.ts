@@ -3,9 +3,9 @@
  */
 
 import { Effect } from 'effect'
-import { DELAYS, RETRY_CONFIG } from '@/scripts/constants'
+import { DELAYS, RETRY_CONFIG } from '@/import/constants'
+import { tryAsync } from '@/import/utils/effect-helpers'
 import type { OSMBoundary, OverpassFeature, OverpassResponse } from '@/types/import.types'
-import { tryAsync } from './effect-helpers'
 
 const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
 

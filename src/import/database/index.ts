@@ -3,12 +3,12 @@
  */
 
 import { Effect } from 'effect'
-import { BATCH_SIZES } from '@/scripts/constants'
-import { processInBatches } from '@/scripts/utils/batch'
-import { tryAsync } from '@/scripts/utils/effect-helpers'
+import { BATCH_SIZES } from '@/import/constants'
+import { processBatch } from '@/import/database/batch'
+import { closePool, getPool, testConnection } from '@/import/database/connection'
+import { processInBatches } from '@/import/utils/batch'
+import { tryAsync } from '@/import/utils/effect-helpers'
 import type { AdminBoundaryImport, ImportStats } from '@/types/import.types'
-import { processBatch } from './batch'
-import { closePool, getPool, testConnection } from './connection'
 
 export const batchInsertBoundaries = (
   boundaries: AdminBoundaryImport[],

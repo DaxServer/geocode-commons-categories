@@ -16,7 +16,7 @@ export const DELAYS = {
   COUNTRY_BATCH_MS: 5000,
 } as const
 
-export const HIERARCHICAL_IMPORT = {
+export const IMPORT = {
   COUNTRY_BATCH_SIZE: 5,
   OVERPASS_TIMEOUT: 90,
 } as const

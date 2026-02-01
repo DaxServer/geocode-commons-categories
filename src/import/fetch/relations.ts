@@ -1,12 +1,9 @@
 /**
- * Fetch relation IDs for hierarchical import
+ * Fetch relation IDs for import
  */
 
 import { Effect } from 'effect'
-import {
-  fetchChildRelationIds,
-  fetchCountryLevelRelations,
-} from '@/scripts/utils/overpass-hierarchical'
+import { fetchChildRelationIds, fetchCountryLevelRelations } from '@/import/utils/overpass-import'
 
 /**
  * Fetch all relation IDs for a country at all admin levels
