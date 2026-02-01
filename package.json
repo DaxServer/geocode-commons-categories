@@ -10,9 +10,11 @@
     "lint": "bun biome check .",
     "format": "bun biome format --write .",
     "format:check": "bun biome format --write . && bun biome check .",
-    "import:data": "bun run src/scripts/import/index.ts",
-    "import:osm": "bun run src/scripts/import/fetch-osm.ts",
-    "import:database": "bun run src/scripts/import/database.ts"
+    "import:data": "bun src/scripts/import/index.ts",
+    "import:osm": "bun src/scripts/import/fetch-osm.ts",
+    "import:database": "bun src/scripts/import/database.ts",
+    "import:hierarchical": "bun src/scripts/import/hierarchical/index.ts",
+    "import:hierarchical:country": "bun src/scripts/import/hierarchical/single-country.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.13",
