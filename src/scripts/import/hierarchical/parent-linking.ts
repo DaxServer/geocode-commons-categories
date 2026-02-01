@@ -181,16 +181,3 @@ export function storeRelationsWithParents(
     return relations
   })
 }
-
-/**
- * Handle edge cases for parent linking
- */
-export function handleParentLinkingEdgeCases(): {
-  warnOverlappingBorders: boolean
-  handleEnclaves: boolean
-} {
-  return {
-    warnOverlappingBorders: true,
-    handleEnclaves: true,
-  }
-}

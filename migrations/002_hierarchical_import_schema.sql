@@ -1,7 +1,4 @@
--- Enable PostGIS extension
-CREATE EXTENSION IF NOT EXISTS postgis;
-
--- Intermediate storage for raw OSM relation data
+-- Storage for OSM relation data
 CREATE TABLE IF NOT EXISTS osm_relations (
   id SERIAL PRIMARY KEY,
   relation_id BIGINT NOT NULL,
@@ -38,4 +35,3 @@ CREATE TABLE IF NOT EXISTS import_progress (
 
 -- Index for import_progress lookups
 CREATE INDEX IF NOT EXISTS idx_import_progress_status ON import_progress(status);
-CREATE INDEX IF NOT EXISTS idx_import_progress_country ON import_progress(country_code);

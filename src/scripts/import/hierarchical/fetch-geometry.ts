@@ -172,7 +172,6 @@ function parseWayGeometry(way: {
 
 /**
  * Simplify a ring by removing redundant collinear points
- * Uses Douglas-Peucker-like algorithm with fixed tolerance
  */
 function simplifyRing(ring: number[][], tolerance = 1e-7): number[][] {
   if (ring.length <= 3) return ring
