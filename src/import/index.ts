@@ -9,7 +9,7 @@ import { batchInsertBoundaries } from '@/import/database'
 import { closePool } from '@/import/database/connection'
 import { getOSMRelationsForTransform, getOSMRelationsForWikidata } from '@/import/database/queries'
 import { verifyImport } from '@/import/database/verification'
-import { importSingleCountry } from '@/import/import'
+import { importAllCountries, importSingleCountry } from '@/import/import'
 import { transformDatabaseRows } from '@/import/transform'
 import { tryAsync } from '@/import/utils/effect-helpers'
 import { logSection } from '@/import/utils/logging'
@@ -22,7 +22,7 @@ function displayConfig(config: ImportConfig): void {
   console.log('╚════════════════════════════════════════════════════════════╝')
   console.log()
   console.log('Configuration:')
-  console.log(`  Country: ${config.countryCode}`)
+  console.log(`  Country: ${config.countryCode || 'All countries'}`)
   console.log(`  Admin levels: ${config.adminLevels.join(', ')}`)
   console.log(`  Batch size: ${config.batchSize}`)
   console.log(`  Skip Wikidata: ${config.skipWikidata ? 'Yes' : 'No'}`)
@@ -115,14 +115,15 @@ export const runImport = (config: ImportConfig): Effect.Effect<void, Error, neve
     const adminLevelRange = getAdminLevelRange()
     const countryCode = config.countryCode
 
-    if (!countryCode) {
-      console.error('COUNTRY_CODE environment variable is required')
-      return
-    }
-
     // Step 1: Run import to fetch OSM data
     logSection('Step 1: Fetching OSM data')
-    yield* importSingleCountry(countryCode, adminLevelRange)
+    if (countryCode) {
+      console.log(`Importing single country: ${countryCode}`)
+      yield* importSingleCountry(countryCode, adminLevelRange)
+    } else {
+      console.log('Importing all countries')
+      yield* importAllCountries()
+    }
 
     // Step 2 & 3: Fetch Wikidata categories
     const wikidataCategories = yield* fetchWikidataCategoriesIfNeeded(
