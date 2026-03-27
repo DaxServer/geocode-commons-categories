@@ -26,7 +26,7 @@ function extractSearchPath(databaseUrl: string): string | undefined {
     const decodedOptions = decodeURIComponent(options)
 
     // Extract search_path value from "-c search_path=schema1,schema2"
-    const match = decodedOptions.match(/-c\s+search_path=([^,\s]+(?:,[^,\s]+)*)/)
+    const match = decodedOptions.match(/-c\s+search_path=(\w+(?:,\w+)*)/)
 
     return match ? match[1] : undefined
   } catch {
