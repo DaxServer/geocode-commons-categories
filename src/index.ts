@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import { Elysia, t } from 'elysia'
 import { config } from './config/env'
+import { runMigrationsIfNeeded } from './db/migrate'
 import { reverseGeocode } from './services/geocode.service'
 import { NotFoundError } from './types/errors'
 import { coordinateSchema, geocodeResponseSchema } from './types/geocode.types'
@@ -51,6 +52,7 @@ new Elysia()
       headers: { 'Content-Type': 'application/json' },
     })
   })
-  .listen(config.port, ({ hostname, port }) => {
+  .listen(config.port, async ({ hostname, port }) => {
+    await runMigrationsIfNeeded()
     console.log(`🦊 Elysia is running at http://${hostname}:${port}`)
   })
