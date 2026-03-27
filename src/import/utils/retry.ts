@@ -8,6 +8,8 @@ import { tryAsync } from '@/import/utils/effect-helpers'
 
 const RETRYABLE_SERVER_ERRORS = [500, 502, 503, 504] as const
 const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
+const USER_AGENT =
+  'Wikimedia Commons / User:DaxServer / geocode-commons-categories/1.0 (https://github.com/DaxServer/geocode-commons-categories)'
 
 type RequestOptions = {
   url: string
@@ -34,6 +36,7 @@ export function fetchWithRetry(options: RequestOptions): Effect.Effect<unknown, 
             headers: {
               'Content-Type': 'text/plain',
               Accept: 'application/json',
+              'User-Agent': USER_AGENT,
             },
           }),
         ),

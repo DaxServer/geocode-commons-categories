@@ -94,11 +94,11 @@ export type ImportStats = {
  * Import configuration
  */
 export type ImportConfig = {
-  countryCode: string
+  countryCode: string | undefined
   adminLevels: number[]
   batchSize: number
   skipWikidata: boolean
-  outputDir: string
+  outputDir: string | undefined
 }
 
 /**

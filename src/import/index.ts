@@ -122,7 +122,7 @@ export const runImport = (config: ImportConfig): Effect.Effect<void, Error, neve
       yield* importSingleCountry(countryCode, adminLevelRange)
     } else {
       console.log('Importing all countries')
-      yield* importAllCountries()
+      yield* importAllCountries(adminLevelRange)
     }
 
     // Step 2 & 3: Fetch Wikidata categories
