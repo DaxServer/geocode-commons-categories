@@ -5,7 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "bun src/index.ts",
+    "dev": "bun --hot src/index.ts",
     "format": "bun biome format --write .",
     "format:check": "bun biome format --write . && bun biome check .",
     "lint": "bun biome check .",
