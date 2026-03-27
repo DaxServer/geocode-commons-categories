@@ -218,7 +218,7 @@ Step 6: Verification
 
 ### Environment Variables for Import
 
-- `COUNTRY_CODE` - ISO country code (required)
+- `COUNTRY_CODE` - ISO country code (optional - if unset, imports all ~250 countries)
 - `ADMIN_LEVEL_START` - Start admin level (default: 4)
 - `ADMIN_LEVEL_END` - End admin level (default: 11)
 - `BATCH_SIZE` - Wikidata API batch size (default: 50)
@@ -252,6 +252,13 @@ The import system uses `out geom;` to fetch full polygon geometries from Overpas
 - This provides accurate boundary representations (not simplified bounding boxes)
 - Trade-off: Full geometries may be slower and may timeout for very large countries
 
+### Overpass API Requirements
+**CRITICAL**: Overpass API requires specific request patterns to avoid rate limiting:
+- **User-Agent header**: Must identify your application (added in `src/import/utils/retry.ts`)
+- **Sequential requests**: Only one request at a time (no parallel requests)
+- Countries are processed sequentially within batches, not in parallel
+- See: `importCountriesBatch()` in `src/import/import.ts`
+
 ### API Endpoint
 Reverse geocoding endpoint is `/geocode?lat={lat}&lon={lon}`, not root path
 - Correct: `curl "http://localhost:3000/geocode?lat=50.85&lon=4.35"`
@@ -261,6 +268,11 @@ Reverse geocoding endpoint is `/geocode?lat={lat}&lon={lon}`, not root path
 After running `bun import:data`, restart the app container to refresh database connection pool
 - Connection pool initializes before import completes
 - `docker compose restart app` fixes "Location not found" errors post-import
+
+### Database Migrations
+- **Auto-migration (docker-compose)**: Migrations in `migrations/` mount to `/docker-entrypoint-initdb.d` and run automatically on postgres container start
+- **Manual migration**: `psql -d your_database -f migrations/001_initial_schema.sql`
+- **Production/K8s**: Migrations run in Elysia `.listen()` callback when `NODE_ENV=production` (see `src/db/migrate.ts`)
 
 ## Runtime Environment
 

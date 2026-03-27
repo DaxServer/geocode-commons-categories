@@ -106,8 +106,11 @@ function importCountriesBatch(
   return Effect.gen(function* () {
     console.log(`\n=== Processing batch of ${countryCodes.length} countries ===`)
 
-    // Import all countries in this batch in parallel
-    yield* Effect.all(countryCodes.map((code) => importCountry(code, adminLevelRange)))
+    // Import all countries in this batch sequentially (one at a time)
+    // Overpass API requires sequential requests, not parallel
+    for (const code of countryCodes) {
+      yield* importCountry(code, adminLevelRange)
+    }
 
     console.log(`\n=== Batch complete ===`)
   })
@@ -116,14 +119,16 @@ function importCountriesBatch(
 /**
  * Main entry point: Import all 250 countries
  */
-export const importAllCountries = (): Effect.Effect<void, Error> => {
+export const importAllCountries = (adminLevelRange: {
+  min: number
+  max: number
+}): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
     console.log('=== Starting import for all countries ===')
 
     const allCodes = getSortedCountryCodes()
     console.log(`Importing ${allCodes.length} countries...`)
 
-    const adminLevelRange = getAdminLevelRange()
     console.log(`Admin level range: ${adminLevelRange.min} to ${adminLevelRange.max}`)
 
     // Process in batches
@@ -175,6 +180,6 @@ if (import.meta.main) {
     Effect.runPromise(importSingleCountry(countryCode, adminLevelRange))
   } else {
     console.log('Importing all countries...')
-    Effect.runPromise(importAllCountries())
+    Effect.runPromise(importAllCountries(adminLevelRange))
   }
 }
