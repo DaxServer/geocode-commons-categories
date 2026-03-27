@@ -45,7 +45,10 @@ export function fetchWithRetry(options: RequestOptions): Effect.Effect<unknown, 
       if (response._tag === 'Left') {
         if (attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
           const delay = baseDelayMs * 2 ** attempt
-          console.warn(`Request failed, retrying in ${delay}ms...`, response.left)
+          console.warn(
+            `[Rate Limiter] Network error on attempt ${attempt + 1}/${RETRY_CONFIG.MAX_ATTEMPTS}, retrying in ${delay}ms...`,
+          )
+          console.warn(`  Error: ${response.left.message}`)
           yield* Effect.sleep(`${delay} millis`)
           continue
         }
@@ -61,8 +64,11 @@ export function fetchWithRetry(options: RequestOptions): Effect.Effect<unknown, 
 
         if (isRetryableStatus && attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
           const delay = baseDelayMs * 2 ** attempt
-          const errorType = res.status === 429 ? 'rate limited' : 'server error'
-          console.warn(`Overpass API ${errorType} (${res.status}), retrying in ${delay}ms...`)
+          const errorType = res.status === 429 ? 'RATE LIMITED' : 'server error'
+          console.warn(
+            `[Rate Limiter] Overpass API ${errorType} (HTTP ${res.status}) on attempt ${attempt + 1}/${RETRY_CONFIG.MAX_ATTEMPTS}`,
+          )
+          console.warn(`  Retrying in ${delay}ms...`)
           yield* Effect.sleep(`${delay} millis`)
           continue
         }

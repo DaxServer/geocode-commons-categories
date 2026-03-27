@@ -429,7 +429,9 @@ export function fetchAllGeometry(relationIds: number[]): Effect.Effect<ParsedGeo
 
       // Rate limiting between batches
       if (i + BATCH_SIZES.OVERPASS_GEOMETRY < relationIds.length) {
-        console.log(`Waiting ${DELAYS.OVERPASS_GEOMETRY_MS}ms before next batch...`)
+        console.log(
+          `[Rate Limiter] Waiting ${DELAYS.OVERPASS_GEOMETRY_MS}ms before next geometry batch (Overpass API cool-down)`,
+        )
         yield* Effect.sleep(`${DELAYS.OVERPASS_GEOMETRY_MS} millis`)
       }
     }

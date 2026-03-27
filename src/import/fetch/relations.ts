@@ -3,6 +3,7 @@
  */
 
 import { Effect } from 'effect'
+import { DELAYS } from '@/import/constants'
 import { fetchChildRelationIds, fetchCountryLevelRelations } from '@/import/utils/overpass-import'
 
 /**
@@ -34,6 +35,10 @@ export function fetchAllRelationIds(
       for (const parentId of parentRelations) {
         const children = yield* fetchChildRelationIds(parentId, level)
         childIds.push(...children)
+
+        // Rate limiting between Overpass API calls
+        // Relation ID queries are lightweight but still need delays to avoid rate limits
+        yield* Effect.sleep(`${DELAYS.OVERPASS_RELATION_MS} millis`)
       }
 
       // Deduplicate child IDs (same child might be under multiple parents at borders)
@@ -80,6 +85,9 @@ export function fetchRelationIdsForLevel(
     for (const parentId of parentRelationIds) {
       const children = yield* fetchChildRelationIds(parentId, adminLevel)
       childIds.push(...children)
+
+      // Rate limiting between Overpass API calls
+      yield* Effect.sleep(`${DELAYS.OVERPASS_RELATION_MS} millis`)
     }
 
     // Deduplicate

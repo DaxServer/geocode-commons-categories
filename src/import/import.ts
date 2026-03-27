@@ -143,7 +143,9 @@ export const importAllCountries = (adminLevelRange: {
 
       // Rate limiting between batches
       if (i < batches.length - 1) {
-        console.log(`Waiting ${DELAYS.COUNTRY_BATCH_MS}ms before next batch...`)
+        console.log(
+          `[Rate Limiter] Waiting ${DELAYS.COUNTRY_BATCH_MS}ms before next country batch (Overpass API cool-down)`,
+        )
         yield* Effect.sleep(`${DELAYS.COUNTRY_BATCH_MS} millis`)
       }
     }
