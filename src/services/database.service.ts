@@ -27,7 +27,7 @@ export const findAdminBoundary = (
         `SELECT wikidata_id, commons_category, admin_level, name
          FROM admin_boundaries
          WHERE ST_Contains(geom, ST_GeomFromText($1, 4326))
-         ORDER BY admin_level, ST_Area(geom) ASC
+         ORDER BY ST_Area(geom) ASC
          LIMIT 1`,
         [point],
       )

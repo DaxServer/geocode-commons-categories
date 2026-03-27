@@ -54,9 +54,7 @@ export function fetchWithRetry(options: RequestOptions): Effect.Effect<unknown, 
       if (!res.ok) {
         const isRetryableStatus =
           res.status === 429 ||
-          RETRYABLE_SERVER_ERRORS.includes(
-            res.status as (typeof RETRYABLE_SERVER_ERRORS)[number],
-          )
+          RETRYABLE_SERVER_ERRORS.includes(res.status as (typeof RETRYABLE_SERVER_ERRORS)[number])
 
         if (isRetryableStatus && attempt < RETRY_CONFIG.MAX_ATTEMPTS - 1) {
           const delay = baseDelayMs * 2 ** attempt
