@@ -18,7 +18,7 @@ export const runMigrations = (): Effect.Effect<void, Error, never> => {
     const databaseUrl = Bun.env.DATABASE_URL
 
     if (!databaseUrl) {
-      throw new Error('DATABASE_URL environment variable is required')
+      yield* Effect.fail(new Error('DATABASE_URL environment variable is required'))
     }
 
     const pool = new Pool({ connectionString: databaseUrl })
