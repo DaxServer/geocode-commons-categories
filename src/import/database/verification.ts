@@ -18,7 +18,7 @@ type NullFieldsRow = {
 
 export const verifyImport = (): Effect.Effect<void, Error, never> => {
   return Effect.gen(function* () {
-    console.log('=== Verifying Import ===')
+    console.log('[Database] Verifying import')
 
     const pool = getPool()
 
@@ -26,7 +26,7 @@ export const verifyImport = (): Effect.Effect<void, Error, never> => {
       async () => await pool.query('SELECT COUNT(*) as count FROM admin_boundaries'),
       'Failed to count records',
     )
-    console.log(`Total records in database: ${(countResult.rows[0] as CountRow).count}`)
+    console.log(`[Database] Total records: ${(countResult.rows[0] as CountRow).count}`)
 
     const levelResult = yield* tryAsync(
       async () =>
@@ -38,9 +38,9 @@ export const verifyImport = (): Effect.Effect<void, Error, never> => {
         `),
       'Failed to count by level',
     )
-    console.log('\nRecords by admin level:')
+    console.log('[Database] Records by admin level:')
     ;(levelResult as QueryResult<AdminLevelRow>).rows.forEach((row) => {
-      console.log(`  Level ${row.admin_level}: ${row.count}`)
+      console.log(`[Database]   Level ${row.admin_level}: ${row.count}`)
     })
 
     const nullResult = yield* tryAsync(
@@ -55,12 +55,12 @@ export const verifyImport = (): Effect.Effect<void, Error, never> => {
         `),
       'Failed to check NULL fields',
     )
-    console.log('\nNULL field counts:')
+    console.log('[Database] NULL field counts:')
     const nullFields = nullResult.rows[0] as NullFieldsRow
-    console.log(`  Wikidata ID: ${nullFields.null_wikidata}`)
-    console.log(`  Commons category: ${nullFields.null_commons}`)
-    console.log(`  Name: ${nullFields.null_name}`)
-    console.log(`  Geometry: ${nullFields.null_geom}`)
+    console.log(`[Database]   Wikidata ID: ${nullFields.null_wikidata}`)
+    console.log(`[Database]   Commons category: ${nullFields.null_commons}`)
+    console.log(`[Database]   Name: ${nullFields.null_name}`)
+    console.log(`[Database]   Geometry: ${nullFields.null_geom}`)
 
     const invalidGeomResult = yield* tryAsync(
       async () =>
@@ -71,6 +71,6 @@ export const verifyImport = (): Effect.Effect<void, Error, never> => {
         `),
       'Failed to check geometries',
     )
-    console.log(`\nInvalid geometries: ${(invalidGeomResult.rows[0] as CountRow).count}`)
+    console.log(`[Database] Invalid geometries: ${(invalidGeomResult.rows[0] as CountRow).count}`)
   })
 }

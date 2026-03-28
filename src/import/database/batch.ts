@@ -3,9 +3,7 @@
  */
 
 import { Effect } from 'effect'
-// biome-ignore lint/style/useImportType: pg is used in type annotations
-import pg from 'pg'
-import type { AdminBoundaryImport } from '@/types/import.types'
+import type { Pool, PoolClient } from 'pg'
 import {
   beginTransaction,
   commitTransaction,
@@ -13,7 +11,8 @@ import {
   insertBoundary,
   releaseClient,
   rollbackTransaction,
-} from './queries'
+} from '@/import/database/queries'
+import type { AdminBoundaryImport } from '@/types/import.types'
 
 export type BatchResult = {
   insertedRecords: number
@@ -21,11 +20,14 @@ export type BatchResult = {
 }
 
 export function processBatchWithClient(
-  client: pg.PoolClient,
+  client: PoolClient,
   batch: AdminBoundaryImport[],
   batchNum: number,
 ): Effect.Effect<BatchResult, Error> {
   return Effect.gen(function* () {
+    const startTime = Date.now()
+    console.log(`[Database] Batch ${batchNum}: Processing ${batch.length} boundaries`)
+
     const errors: Array<{ record: string; error: string }> = []
     let insertedRecords = 0
 
@@ -46,14 +48,21 @@ export function processBatchWithClient(
 
     yield* commitTransaction(client)
 
-    console.log(`Batch ${batchNum} committed: ${insertedRecords} total inserted`)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(
+      `[Database] Batch ${batchNum} committed: ${insertedRecords} inserted (${duration}s)`,
+    )
+
+    if (errors.length > 0) {
+      console.warn(`[Database] Batch ${batchNum} had ${errors.length} errors`)
+    }
 
     return { insertedRecords, errors }
   })
 }
 
 export function processBatch(
-  pool: pg.Pool,
+  pool: Pool,
   batch: AdminBoundaryImport[],
   batchNum: number,
 ): Effect.Effect<BatchResult, Error> {

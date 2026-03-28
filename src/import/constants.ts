@@ -28,6 +28,9 @@ export const IMPORT = {
   OVERPASS_TIMEOUT: 90,
 } as const
 
+export const USER_AGENT =
+  'Wikimedia Commons / User:DaxServer / geocode-commons-categories/1.0 (https://github.com/DaxServer/geocode-commons-categories)'
+
 /**
  * Get admin level range from environment variables
  */

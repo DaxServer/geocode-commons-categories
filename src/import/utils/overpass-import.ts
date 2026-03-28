@@ -11,13 +11,17 @@ import { fetchOverpass } from '@/import/utils/retry'
  * Build query to fetch relation IDs by ISO3166-1:alpha3 tag (for country level only)
  */
 export function buildCountryLevelQuery(iso3Code: string, adminLevel: number): string {
-  return `
+  const query = `
     [out:json][timeout:${IMPORT.OVERPASS_TIMEOUT}];
     (
       relation["boundary"="administrative"]["admin_level"="${adminLevel}"]["ISO3166-1:alpha3"="${iso3Code}"];
     );
     out ids;
   `
+
+  console.log(query)
+
+  return query
 }
 
 /**
@@ -26,13 +30,17 @@ export function buildCountryLevelQuery(iso3Code: string, adminLevel: number): st
 export function buildChildQuery(parentRelationId: number, childLevel: number): string {
   // Convert relation ID to area ID (Overpass area IDs for relations are 3600000000 + relationId)
   const areaId = 3600000000 + parentRelationId
-  return `
+  const query = `
     [out:json][timeout:${IMPORT.OVERPASS_TIMEOUT}];
     (
       relation["boundary"="administrative"]["admin_level"="${childLevel}"](area:${areaId});
     );
     out ids;
   `
+
+  console.log(query)
+
+  return query
 }
 
 /**
@@ -40,7 +48,7 @@ export function buildChildQuery(parentRelationId: number, childLevel: number): s
  */
 export function buildGeometryQuery(relationIds: number[]): string {
   const idList = relationIds.join(',')
-  return `
+  const query = `
     [out:json][timeout:${IMPORT.OVERPASS_TIMEOUT}];
     (
       relation(id:${idList});
@@ -48,12 +56,11 @@ export function buildGeometryQuery(relationIds: number[]): string {
     );
     out geom;
   `
-}
 
-/**
- * Fetch data from Overpass API with retry logic
- */
-export { fetchOverpass } from '@/import/utils/retry'
+  console.log(query)
+
+  return query
+}
 
 /**
  * Fetch relation IDs for a country at a specific admin level (level 2 only - uses ISO3166-1:alpha3 tag)
@@ -65,6 +72,7 @@ export function fetchCountryLevelRelations(
   return Effect.gen(function* () {
     const startTime = Date.now()
     const query = buildCountryLevelQuery(iso3Code, adminLevel)
+    console.log(`[OverpassAPI] Query: country-level ${iso3Code} admin_level=${adminLevel}`)
     const data = (yield* fetchOverpass(query)) as unknown as {
       elements: Array<{ type: string; id: number }>
     }
@@ -97,6 +105,9 @@ export function fetchChildRelationIds(
   return Effect.gen(function* () {
     const startTime = Date.now()
     const query = buildChildQuery(parentRelationId, childLevel)
+    console.log(
+      `[OverpassAPI] Query: child-relations parent=${parentRelationId} admin_level=${childLevel}`,
+    )
     const data = (yield* fetchOverpass(query)) as unknown as {
       elements: Array<{ type: string; id: number }>
     }

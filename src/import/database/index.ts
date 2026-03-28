@@ -6,6 +6,7 @@ import { Effect } from 'effect'
 import { BATCH_SIZES } from '@/import/constants'
 import { processBatch } from '@/import/database/batch'
 import { closePool, getPool, testConnection } from '@/import/database/connection'
+import { verifyImport } from '@/import/database/verification'
 import { processInBatches } from '@/import/utils/batch'
 import { tryAsync } from '@/import/utils/effect-helpers'
 import type { AdminBoundaryImport, ImportStats } from '@/types/import.types'
@@ -15,6 +16,7 @@ export const batchInsertBoundaries = (
   batchSize: number = BATCH_SIZES.DATABASE,
 ): Effect.Effect<ImportStats, Error> => {
   return Effect.gen(function* () {
+    const startTime = Date.now()
     const stats: ImportStats = {
       osmRecords: 0,
       wikidataRecords: boundaries.length,
@@ -24,12 +26,11 @@ export const batchInsertBoundaries = (
       errors: [],
     }
 
-    console.log('=== Inserting Boundaries into Database ===')
-    console.log(`Total boundaries to insert: ${boundaries.length}`)
-    console.log(`Batch size: ${batchSize}`)
+    console.log('[Database] Inserting boundaries into database')
+    console.log(`[Database] Total boundaries: ${boundaries.length}, batch size: ${batchSize}`)
 
     yield* testConnection()
-    console.log('Database connection established')
+    console.log('[Database] Connection established')
 
     const batchResults = yield* processInBatches(
       boundaries,
@@ -38,13 +39,13 @@ export const batchInsertBoundaries = (
         processBatch(getPool(), batch, batchNum).pipe(
           Effect.map((result) => ({ success: true, result })),
           Effect.catchAll((error) => {
-            console.error(`Batch ${batchNum} failed:`, error)
+            console.error(`[Database] Batch ${batchNum} failed:`, error)
             return Effect.succeed({ success: false, error })
           }),
         ),
       {
         onProgress: (batchNum, totalBatches) =>
-          console.log(`\nProcessing batch ${batchNum}/${totalBatches}`),
+          console.log(`[Database] Processing batch ${batchNum}/${totalBatches}`),
       },
     )
 
@@ -55,14 +56,14 @@ export const batchInsertBoundaries = (
       }
     }
 
-    console.log(`\n=== Import Complete ===`)
-    console.log(`Successfully inserted: ${stats.insertedRecords}`)
-    console.log(`Errors: ${stats.errors.length}`)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[Database] Insert complete: ${stats.insertedRecords} inserted (${duration}s)`)
+    console.log(`[Database] Errors: ${stats.errors.length}`)
 
     if (stats.errors.length > 0) {
-      console.log('\nFirst 10 errors:')
+      console.log('[Database] First 10 errors:')
       stats.errors.slice(0, 10).forEach(({ record, error }) => {
-        console.log(`  - ${record}: ${error}`)
+        console.log(`[Database]   - ${record}: ${error}`)
       })
     }
 
@@ -75,8 +76,6 @@ export const batchInsertBoundaries = (
  */
 export async function main() {
   const inputFile = Bun.env.INPUT_FILE
-
-  const { verifyImport } = await import('./verification')
 
   const program = Effect.gen(function* () {
     const boundaries = yield* tryAsync(async () => {

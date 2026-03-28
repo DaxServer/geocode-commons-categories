@@ -146,10 +146,18 @@ export function storeRelationsWithParents(
   adminLevel: number,
 ): Effect.Effect<OSMRelation[], Error> {
   return Effect.gen(function* () {
+    const startTime = Date.now()
+    console.log(
+      `[Transform] Converting ${parsedGeometries.length} geometries to OSMRelation format`,
+    )
+
     // Convert to OSMRelation format
     const relations = parsedGeometries.map((parsed) => convertToOSMRelation(parsed, countryCode))
 
-    console.log(`Converted ${relations.length} relations for ${countryCode} at level ${adminLevel}`)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(
+      `[Transform] Converted ${relations.length} relations for ${countryCode} at level ${adminLevel} (${duration}s)`,
+    )
 
     return relations
   })

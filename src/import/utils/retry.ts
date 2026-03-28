@@ -3,13 +3,11 @@
  */
 
 import { Effect } from 'effect'
-import { DELAYS, RETRY_CONFIG } from '@/import/constants'
+import { DELAYS, RETRY_CONFIG, USER_AGENT } from '@/import/constants'
 import { tryAsync } from '@/import/utils/effect-helpers'
 
 const RETRYABLE_SERVER_ERRORS = [500, 502, 503, 504] as const
 const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
-const USER_AGENT =
-  'Wikimedia Commons / User:DaxServer / geocode-commons-categories/1.0 (https://github.com/DaxServer/geocode-commons-categories)'
 
 type RequestOptions = {
   url: string

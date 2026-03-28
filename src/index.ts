@@ -1,10 +1,10 @@
 import { Effect } from 'effect'
 import { Elysia, t } from 'elysia'
-import { config } from './config/env'
-import { runMigrationsIfNeeded } from './db/migrate'
-import { reverseGeocode } from './services/geocode.service'
-import { NotFoundError } from './types/errors'
-import { coordinateSchema, geocodeResponseSchema } from './types/geocode.types'
+import { config } from '@/config/env'
+import { runMigrationsIfNeeded } from '@/db/migrate'
+import { reverseGeocode } from '@/services/geocode.service'
+import { NotFoundError } from '@/types/errors'
+import { coordinateSchema, geocodeResponseSchema } from '@/types/geocode.types'
 
 new Elysia()
   .get(

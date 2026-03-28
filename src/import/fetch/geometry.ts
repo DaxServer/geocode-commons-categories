@@ -4,7 +4,8 @@
 
 import { Effect } from 'effect'
 import { BATCH_SIZES, DELAYS } from '@/import/constants'
-import { buildGeometryQuery, fetchOverpass } from '@/import/utils/overpass-import'
+import { buildGeometryQuery } from '@/import/utils/overpass-import'
+import { fetchOverpass } from '@/import/utils/retry'
 import type { ParsedGeometry } from '@/types/import.types'
 
 /**
@@ -340,6 +341,9 @@ export function fetchGeometryBatch(relationIds: number[]): Effect.Effect<ParsedG
     console.log(`[Geometry] Fetching geometry for ${relationIds.length} relations...`)
 
     const query = buildGeometryQuery(relationIds)
+    console.log(
+      `[OverpassAPI] Query: geometry-batch relations=${relationIds.length} ids=${relationIds.slice(0, 3).join(',')}${relationIds.length > 3 ? '...' : ''}`,
+    )
     const data = (yield* fetchOverpass(query)) as unknown as {
       elements: Array<{
         type: string

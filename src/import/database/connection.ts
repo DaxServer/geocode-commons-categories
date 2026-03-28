@@ -3,14 +3,12 @@
  */
 
 import type { Effect } from 'effect'
-import pg from 'pg'
+import { Pool } from 'pg'
 import { tryAsync } from '@/import/utils/effect-helpers'
 
-const { Pool } = pg
+let poolInstance: Pool | null = null
 
-let poolInstance: pg.Pool | null = null
-
-export function getPool(): pg.Pool {
+export function getPool(): Pool {
   if (!poolInstance) {
     poolInstance = new Pool({
       connectionString: Bun.env.DATABASE_URL,

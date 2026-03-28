@@ -27,7 +27,7 @@ function importCountry(
 ): Effect.Effect<void, Error> {
   return Effect.gen(function* () {
     const startTime = Date.now()
-    console.log(`\n[Import] Starting import for ${iso3Code}`)
+    console.log(`[Import] Starting import for ${iso3Code}`)
 
     // Initialize progress tracking
     yield* initializeProgress(iso3Code)
@@ -36,7 +36,7 @@ function importCountry(
     const relationMap = yield* fetchAllRelationIds(iso3Code, adminLevelRange.max)
 
     if (relationMap.size === 0) {
-      console.warn(`No relations found for ${iso3Code}`)
+      console.warn(`[Import] No relations found for ${iso3Code}`)
       yield* markFailed(iso3Code, 'No relations found')
       return
     }
@@ -48,19 +48,19 @@ function importCountry(
       const relationIds = relationMap.get(level)
 
       if (!relationIds || relationIds.length === 0) {
-        console.log(`No relations at level ${level} for ${iso3Code}, skipping`)
+        console.log(`[Import] No relations at level ${level} for ${iso3Code}, skipping`)
         continue
       }
 
       console.log(
-        `\n--- Processing ${iso3Code} level ${level} (${relationIds.length} relations) ---`,
+        `[Import] Processing ${iso3Code} level ${level} (${relationIds.length} relations)`,
       )
 
       // Fetch geometry for all relations at this level
       const parsedGeometries = yield* fetchAllGeometry(relationIds)
 
       if (parsedGeometries.length === 0) {
-        console.warn(`No geometries parsed for ${iso3Code} at level ${level}`)
+        console.warn(`[Import] No geometries parsed for ${iso3Code} at level ${level}`)
         continue
       }
 
@@ -89,7 +89,7 @@ function importCountry(
     // Show final stats
     const stats = yield* getCountryStats(iso3Code)
     const duration = ((Date.now() - startTime) / 1000).toFixed(1)
-    console.log(`\n[Import] Completed ${iso3Code} import (total: ${duration}s)`)
+    console.log(`[Import] Completed ${iso3Code} import (total: ${duration}s)`)
     console.log(`[Import] Total relations: ${stats.totalRelations}`)
     console.log(`[Import] By admin level:`)
     for (const levelStat of stats.byAdminLevel) {
@@ -106,7 +106,7 @@ function importCountriesBatch(
   adminLevelRange: { min: number; max: number },
 ): Effect.Effect<void, Error> {
   return Effect.gen(function* () {
-    console.log(`\n=== Processing batch of ${countryCodes.length} countries ===`)
+    console.log(`[Import] Processing batch of ${countryCodes.length} countries`)
 
     // Import all countries in this batch sequentially (one at a time)
     // Overpass API requires sequential requests, not parallel
@@ -114,7 +114,7 @@ function importCountriesBatch(
       yield* importCountry(code, adminLevelRange)
     }
 
-    console.log(`\n=== Batch complete ===`)
+    console.log(`[Import] Batch complete`)
   })
 }
 
@@ -139,7 +139,7 @@ export const importAllCountries = (adminLevelRange: {
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i]
       if (!batch) break
-      console.log(`\n### Processing batch ${i + 1}/${batches.length} ###`)
+      console.log(`[Import] Processing batch ${i + 1}/${batches.length}`)
 
       yield* importCountriesBatch(batch, adminLevelRange)
 
@@ -152,7 +152,7 @@ export const importAllCountries = (adminLevelRange: {
       }
     }
 
-    console.log('\n[Import] Import complete for all countries')
+    console.log('[Import] Import complete for all countries')
   })
 }
 
@@ -168,7 +168,7 @@ export const importSingleCountry = (
 
     yield* importCountry(iso3Code, adminLevelRange)
 
-    console.log(`\n[Import] Single country import complete for ${iso3Code}`)
+    console.log(`[Import] Single country import complete for ${iso3Code}`)
   })
 }
 

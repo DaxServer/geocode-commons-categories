@@ -2,20 +2,25 @@
  * Tests for shared retry utility
  */
 
-import { beforeAll, describe, expect, mock, test } from 'bun:test'
+import { describe, expect, mock, test } from 'bun:test'
 import { Effect } from 'effect'
+import { DELAYS, RETRY_CONFIG } from '@/import/constants'
 import { fetchWithRetry } from './retry'
 import { mockConsole } from './test-utils'
 
-// Use 1ms delay for fast tests
+// Use test-friendly delays
 const TEST_DELAY_MS = 1
 
 describe('fetchWithRetry', () => {
-  beforeAll(() => {
-    mockConsole()
-  })
+  // Disable penalty for tests to avoid long waits
+  // Set test-friendly values
+  // @ts-expect-error - modifying for tests
+  RETRY_CONFIG.PENALTY_ENABLED = false
+  // @ts-expect-error - modifying for tests
+  DELAYS.RATE_LIMIT_PENALTY_MS = 0
 
   test('should succeed on first attempt with valid response', async () => {
+    mockConsole()
     const mockFetch = mock(async () =>
       Response.json({
         elements: [{ id: 123, type: 'relation' }],
@@ -38,6 +43,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should retry on HTTP 429 rate limit and eventually succeed', async () => {
+    mockConsole()
     let attemptCount = 0
     const mockFetch = mock(async () => {
       attemptCount++
@@ -65,6 +71,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should retry on HTTP 500 server error and eventually succeed', async () => {
+    mockConsole()
     let attemptCount = 0
     const mockFetch = mock(async () => {
       attemptCount++
@@ -95,6 +102,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should retry on HTTP 502 Bad Gateway', async () => {
+    mockConsole()
     let attemptCount = 0
     const mockFetch = mock(async () => {
       attemptCount++
@@ -118,6 +126,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should retry on HTTP 503 Service Unavailable', async () => {
+    mockConsole()
     let attemptCount = 0
     const mockFetch = mock(async () => {
       attemptCount++
@@ -144,6 +153,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should retry on HTTP 504 Gateway Timeout', async () => {
+    mockConsole()
     let attemptCount = 0
     const mockFetch = mock(async () => {
       attemptCount++
@@ -167,6 +177,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should fail immediately on non-retryable error (404)', async () => {
+    mockConsole()
     const mockFetch = mock(
       async () => new Response('Not Found', { status: 404, statusText: 'Not Found' }),
     ) as unknown as typeof fetch
@@ -185,6 +196,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should fail immediately on non-retryable error (400)', async () => {
+    mockConsole()
     const mockFetch = mock(
       async () => new Response('Bad Request', { status: 400, statusText: 'Bad Request' }),
     ) as unknown as typeof fetch
@@ -203,6 +215,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should retry on network errors and eventually succeed', async () => {
+    mockConsole()
     let attemptCount = 0
     const mockFetch = mock(async () => {
       attemptCount++
@@ -226,6 +239,7 @@ describe('fetchWithRetry', () => {
   })
 
   test('should fail after max retries on persistent 504', async () => {
+    mockConsole()
     const mockFetch = mock(
       async () => new Response('Gateway Timeout', { status: 504, statusText: 'Gateway Timeout' }),
     ) as unknown as typeof fetch
@@ -240,11 +254,12 @@ describe('fetchWithRetry', () => {
     )
 
     await expect(result).rejects.toThrow('Overpass API error: 504 Gateway Timeout')
-    // MAX_ATTEMPTS is 3, so should see 3 attempts
-    expect(mockFetch).toHaveBeenCalledTimes(3)
+    // MAX_ATTEMPTS is 5 in production
+    expect(mockFetch).toHaveBeenCalledTimes(RETRY_CONFIG.MAX_ATTEMPTS)
   })
 
   test('should fail after max retries on persistent rate limit', async () => {
+    mockConsole()
     const mockFetch = mock(
       async () => new Response('Rate limited', { status: 429, statusText: 'Too Many Requests' }),
     ) as unknown as typeof fetch
@@ -259,10 +274,12 @@ describe('fetchWithRetry', () => {
     )
 
     await expect(result).rejects.toThrow('Overpass API error: 429 Too Many Requests')
-    expect(mockFetch).toHaveBeenCalledTimes(3)
+    // MAX_ATTEMPTS is 5 in production
+    expect(mockFetch).toHaveBeenCalledTimes(RETRY_CONFIG.MAX_ATTEMPTS)
   })
 
   test('should fail after max retries on persistent network errors', async () => {
+    mockConsole()
     const mockFetch = mock(async () => {
       throw new Error('Persistent network error')
     }) as unknown as typeof fetch
@@ -277,6 +294,7 @@ describe('fetchWithRetry', () => {
     )
 
     await expect(result).rejects.toThrow('Persistent network error')
-    expect(mockFetch).toHaveBeenCalledTimes(3)
+    // MAX_ATTEMPTS is 5 in production
+    expect(mockFetch).toHaveBeenCalledTimes(RETRY_CONFIG.MAX_ATTEMPTS)
   })
 })
