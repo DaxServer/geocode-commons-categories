@@ -259,6 +259,19 @@ The import system uses `out geom;` to fetch full polygon geometries from Overpas
 - Countries are processed sequentially within batches, not in parallel
 - See: `importCountriesBatch()` in `src/import/import.ts`
 
+### Overpass API Rate Limiting
+**CRITICAL**: Overpass API uses slot-based rate limiting - requests occupy slots for "execution time + cool down time":
+- **Cool down time**: Grows with server load (can be 2-3x execution time during high load)
+- **Slot mechanism**: Each user gets ~2 slots; requests wait 15s then get HTTP 429 if no slot available
+- **Working delays** (in `src/import/constants.ts`):
+  - `OVERPASS_GEOMETRY_MS`: 8000ms (8 seconds between geometry batches)
+  - `OVERPASS_RELATION_MS`: 2000ms (2 seconds between relation ID fetches)
+  - `COUNTRY_BATCH_MS`: 10000ms (10 seconds between country batches)
+- **Batch size**: `OVERPASS_GEOMETRY` = 25 relations per batch (smaller batches = faster execution = shorter cool down)
+- **Retry config**: `MAX_ATTEMPTS` = 5 for transient failures during high load
+- **All sequential API calls need delays**: Add `Effect.sleep()` between iterations (see `src/import/fetch/relations.ts`)
+- **Reference**: https://dev.overpass-api.de/overpass-doc/en/preface/commons.html
+
 ### API Endpoint
 Reverse geocoding endpoint is `/geocode?lat={lat}&lon={lon}`, not root path
 - Correct: `curl "http://localhost:3000/geocode?lat=50.85&lon=4.35"`
