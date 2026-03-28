@@ -48,7 +48,7 @@ export function fetchWithRetry(options: RequestOptions): Effect.Effect<unknown, 
           console.warn(
             `[Rate Limiter] Network error on attempt ${attempt + 1}/${RETRY_CONFIG.MAX_ATTEMPTS}, retrying in ${delay}ms...`,
           )
-          console.warn(`  Error: ${response.left.message}`)
+          console.warn(`  Error:`, response.left)
           yield* Effect.sleep(`${delay} millis`)
           continue
         }
