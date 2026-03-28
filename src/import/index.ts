@@ -18,13 +18,13 @@ import type { AdminBoundaryImport, ImportConfig, ImportStats } from '@/types/imp
 
 function displayConfig(config: ImportConfig): void {
   console.log('╔════════════════════════════════════════════════════════════╗')
-  console.log('║   Administrative Boundary Data Import System            ║')
+  console.log('║         Administrative Boundary Data Import System         ║')
   console.log('╚════════════════════════════════════════════════════════════╝')
   console.log()
   console.log('Configuration:')
-  console.log(`  Country: ${config.countryCode || 'All countries'}`)
-  console.log(`  Admin levels: ${config.adminLevels.join(', ')}`)
-  console.log(`  Batch size: ${config.batchSize}`)
+  console.log(`  Country:       ${config.countryCode || 'All countries'}`)
+  console.log(`  Admin levels:  ${config.adminLevels.join(', ')}`)
+  console.log(`  Batch size:    ${config.batchSize}`)
   console.log(`  Skip Wikidata: ${config.skipWikidata ? 'Yes' : 'No'}`)
   console.log()
 }
@@ -41,27 +41,33 @@ function fetchWikidataCategoriesIfNeeded(
 ): Effect.Effect<Map<string, string>, Error, never> {
   return Effect.gen(function* () {
     if (skip) {
+      console.log('[Wikidata] Skipping Wikidata category fetch (skipWikidata=true)')
       return new Map()
     }
 
+    const startTime = Date.now()
     logSection('Step 2: Extracting Wikidata IDs from OSM relations')
 
     const rows = yield* getOSMRelationsForWikidata(countryCode)
-    console.log(`Found ${rows.length} OSM relations with Wikidata IDs`)
+    const duration1 = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[Database] Found ${rows.length} OSM relations with Wikidata IDs (${duration1}s)`)
 
     const wikidataIds = extractWikidataIds(rows)
-    console.log(`Extracted ${wikidataIds.length} unique Wikidata IDs`)
+    console.log(`[Wikidata] Extracted ${wikidataIds.length} unique Wikidata IDs`)
 
     if (wikidataIds.length === 0) {
-      console.warn('No Wikidata IDs found in OSM relations')
+      console.warn('[Wikidata] No Wikidata IDs found in OSM relations')
       return new Map()
     }
 
+    const fetchStartTime = Date.now()
     logSection('Step 3: Fetching Commons categories from Wikidata')
     const categories = yield* fetchWikimediaCategoriesBatch(wikidataIds)
+    const fetchDuration = ((Date.now() - fetchStartTime) / 1000).toFixed(1)
+    console.log(`[Wikidata] Fetched ${categories.size} Commons categories (${fetchDuration}s)`)
 
     if (categories.size === 0) {
-      console.warn('No Commons categories fetched. Continuing without Wikidata data.')
+      console.warn('[Wikidata] No Commons categories fetched. Continuing without Wikidata data.')
     }
 
     return categories
@@ -74,16 +80,19 @@ function saveTransformedData(
 ): Effect.Effect<void, Error, never> {
   return Effect.gen(function* () {
     if (!config.outputDir) {
-      console.log('Skipping save (no output directory configured)')
+      console.log('[Transform] Skipping save (no output directory configured)')
       return
     }
+    const startTime = Date.now()
     const filename = config.countryCode || 'global'
     const outputPath = join(config.outputDir, `transformed-${filename}.json`)
+    console.log(`[Transform] Saving ${boundaries.length} transformed boundaries to ${outputPath}`)
     yield* tryAsync(
       async () => await Bun.write(outputPath, JSON.stringify(boundaries, null, 2)),
       'Failed to write transformed data',
     )
-    console.log(`Saved transformed data to ${outputPath}`)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[Transform] Saved transformed data to ${outputPath} (${duration}s)`)
   })
 }
 
@@ -97,11 +106,11 @@ function displaySummary(
   console.log('╔════════════════════════════════════════════════════════════╗')
   console.log('║                      Import Summary                        ║')
   console.log('╚════════════════════════════════════════════════════════════╝')
-  console.log(`OSM relations imported:    ${osmCount}`)
-  console.log(`Wikidata IDs found:       ${wikidataCount}`)
-  console.log(`Matched records:          ${transformedCount}`)
-  console.log(`Successfully inserted:     ${stats.insertedRecords}`)
-  console.log(`Errors:                   ${stats.errors.length}`)
+  console.log(`OSM relations imported: ${osmCount}`)
+  console.log(`Wikidata IDs found:     ${wikidataCount}`)
+  console.log(`Matched records:        ${transformedCount}`)
+  console.log(`Successfully inserted:  ${stats.insertedRecords}`)
+  console.log(`Errors:                 ${stats.errors.length}`)
   console.log()
 }
 
@@ -133,19 +142,24 @@ export const runImport = (config: ImportConfig): Effect.Effect<void, Error, neve
 
     // Step 4: Get OSM relations from database and transform
     logSection('Step 4: Transforming and enriching data')
+    const transformStartTime = Date.now()
     const osmRelations = yield* getOSMRelationsForTransform(countryCode)
 
     if (osmRelations.length === 0) {
-      console.error('No OSM relations found in database. Aborting import.')
+      console.error('[Transform] No OSM relations found in database. Aborting import.')
       return
     }
 
-    console.log(`Found ${osmRelations.length} OSM relations in database`)
+    console.log(`[Database] Retrieved ${osmRelations.length} OSM relations from database`)
 
     const transformedBoundaries = transformDatabaseRows(osmRelations, wikidataCategories)
+    const transformDuration = ((Date.now() - transformStartTime) / 1000).toFixed(1)
+    console.log(
+      `[Transform] Transformed ${transformedBoundaries.length} boundaries with Wikidata enrichment (${transformDuration}s)`,
+    )
 
     if (transformedBoundaries.length === 0) {
-      console.error('No transformed boundaries. Aborting import.')
+      console.error('[Transform] No transformed boundaries. Aborting import.')
       return
     }
 
@@ -153,7 +167,10 @@ export const runImport = (config: ImportConfig): Effect.Effect<void, Error, neve
 
     // Step 5: Insert to admin_boundaries table
     logSection('Step 5: Inserting data into admin_boundaries table')
+    const insertStartTime = Date.now()
     const stats = yield* batchInsertBoundaries(transformedBoundaries, config.batchSize)
+    const insertDuration = ((Date.now() - insertStartTime) / 1000).toFixed(1)
+    console.log(`[Database] Insert complete in ${insertDuration}s`)
 
     displaySummary(
       stats,

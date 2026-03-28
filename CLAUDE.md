@@ -264,13 +264,24 @@ The import system uses `out geom;` to fetch full polygon geometries from Overpas
 - **Cool down time**: Grows with server load (can be 2-3x execution time during high load)
 - **Slot mechanism**: Each user gets ~2 slots; requests wait 15s then get HTTP 429 if no slot available
 - **Working delays** (in `src/import/constants.ts`):
-  - `OVERPASS_GEOMETRY_MS`: 8000ms (8 seconds between geometry batches)
-  - `OVERPASS_RELATION_MS`: 2000ms (2 seconds between relation ID fetches)
-  - `COUNTRY_BATCH_MS`: 10000ms (10 seconds between country batches)
-- **Batch size**: `OVERPASS_GEOMETRY` = 25 relations per batch (smaller batches = faster execution = shorter cool down)
-- **Retry config**: `MAX_ATTEMPTS` = 5 for transient failures during high load
+  - `OVERPASS_GEOMETRY_MS`: 30000ms (30 seconds between geometry batches)
+  - `OVERPASS_RELATION_MS`: 30000ms (30 seconds between relation ID fetches)
+  - `COUNTRY_BATCH_MS`: 30000ms (30 seconds between country batches)
+  - `RATE_LIMIT_PENALTY_MS`: 120000ms (2-minute penalty cooldown after any HTTP 429)
+- **Batch size**: `OVERPASS_GEOMETRY` = 15 relations per batch (reduced from 25 for faster execution)
+- **Retry config**: `MAX_ATTEMPTS` = 5, `PENALTY_ENABLED` = true for aggressive rate limit avoidance
 - **All sequential API calls need delays**: Add `Effect.sleep()` between iterations (see `src/import/fetch/relations.ts`)
+- **Sleep logging**: Always log "Waiting {X}s..." before and "Wait complete, resuming" after sleep calls
 - **Reference**: https://dev.overpass-api.de/overpass-doc/en/preface/commons.html
+
+### Import System Logging Pattern
+All import operations use standardized logging format: `[Category] Message (duration)`
+- **Categories**: [OverpassAPI], [RateLimiter], [Geometry], [Database], [Import]
+- **Example**: `[OverpassAPI] Found 15 relations (0.4s)`
+- **Sleep operations**: Log both start and end for transparency during long delays
+  - Start: `[RateLimiter] Waiting 30s before next batch`
+  - End: `[RateLimiter] Wait complete, resuming`
+- **Duration formatting**: Always use seconds with 1 decimal place (e.g., `8.2s`)
 
 ### API Endpoint
 Reverse geocoding endpoint is `/geocode?lat={lat}&lon={lon}`, not root path

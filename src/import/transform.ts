@@ -78,7 +78,8 @@ export function enrichDatabaseRowsWithWikidata(
   }>,
   wikidataCategories: Map<string, string>,
 ): AdminBoundaryImport[] {
-  console.log('=== Enriching Database Rows with Wikidata Data ===')
+  const startTime = Date.now()
+  console.log(`[Transform] Enriching ${rows.length} database rows with Wikidata data`)
 
   const enriched: AdminBoundaryImport[] = []
   let skippedCount = 0
@@ -93,7 +94,9 @@ export function enrichDatabaseRowsWithWikidata(
 
     if (!commonsCategory) {
       skippedCount++
-      console.debug(`No Commons category for Wikidata ID ${row.wikidata_id} (${row.name})`)
+      console.debug(
+        `[Transform] No Commons category for Wikidata ID ${row.wikidata_id} (${row.name})`,
+      )
       continue
     }
 
@@ -106,8 +109,10 @@ export function enrichDatabaseRowsWithWikidata(
     })
   }
 
-  console.log(`Enriched: ${enriched.length} boundaries`)
-  console.log(`Skipped: ${skippedCount} rows (no wikidata_id or Commons category)`)
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+  console.log(
+    `[Transform] Enriched ${enriched.length} boundaries, skipped ${skippedCount} (${duration}s)`,
+  )
 
   return enriched
 }
@@ -116,7 +121,8 @@ export function enrichDatabaseRowsWithWikidata(
  * Validate and filter boundaries with invalid geometries
  */
 export function validateGeometries(boundaries: AdminBoundaryImport[]): AdminBoundaryImport[] {
-  console.log('=== Validating Geometries ===')
+  const startTime = Date.now()
+  console.log(`[Transform] Validating geometries for ${boundaries.length} boundaries`)
 
   const valid: AdminBoundaryImport[] = []
   let invalidCount = 0
@@ -124,7 +130,7 @@ export function validateGeometries(boundaries: AdminBoundaryImport[]): AdminBoun
   for (const boundary of boundaries) {
     // Basic validation: check if EWKT is well-formed
     if (!boundary.geom.startsWith('SRID=4326;POLYGON((')) {
-      console.warn(`Invalid geometry format for: ${boundary.name}`)
+      console.warn(`[Transform] Invalid geometry format for: ${boundary.name}`)
       invalidCount++
       continue
     }
@@ -132,7 +138,7 @@ export function validateGeometries(boundaries: AdminBoundaryImport[]): AdminBoun
     // Check for minimum polygon validity (has coordinates)
     const coords = boundary.geom.match(/POLYGON\(\((.+)\)\)/)?.[1]
     if (!coords || coords.split(',').length < 4) {
-      console.warn(`Invalid polygon coordinates for: ${boundary.name}`)
+      console.warn(`[Transform] Invalid polygon coordinates for: ${boundary.name}`)
       invalidCount++
       continue
     }
@@ -140,8 +146,10 @@ export function validateGeometries(boundaries: AdminBoundaryImport[]): AdminBoun
     valid.push(boundary)
   }
 
-  console.log(`Valid geometries: ${valid.length}`)
-  console.log(`Invalid geometries: ${invalidCount}`)
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+  console.log(
+    `[Transform] Valid ${valid.length} geometries, invalid ${invalidCount} (${duration}s)`,
+  )
 
   return valid
 }
@@ -150,7 +158,8 @@ export function validateGeometries(boundaries: AdminBoundaryImport[]): AdminBoun
  * Remove duplicates by wikidata_id
  */
 export function deduplicateBoundaries(boundaries: AdminBoundaryImport[]): AdminBoundaryImport[] {
-  console.log('=== Deduplicating Boundaries ===')
+  const startTime = Date.now()
+  console.log(`[Transform] Deduplicating ${boundaries.length} boundaries`)
 
   const seen = new Set<string>()
   const unique: AdminBoundaryImport[] = []
@@ -162,8 +171,11 @@ export function deduplicateBoundaries(boundaries: AdminBoundaryImport[]): AdminB
     }
   }
 
-  console.log(`Duplicates removed: ${boundaries.length - unique.length}`)
-  console.log(`Unique boundaries: ${unique.length}`)
+  const duplicatesRemoved = boundaries.length - unique.length
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+  console.log(
+    `[Transform] Removed ${duplicatesRemoved} duplicates, ${unique.length} unique boundaries (${duration}s)`,
+  )
 
   return unique
 }

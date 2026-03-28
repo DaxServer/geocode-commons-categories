@@ -4,7 +4,8 @@
 
 import { Effect } from 'effect'
 import { BATCH_SIZES, DELAYS } from '@/import/constants'
-import { buildGeometryQuery, fetchOverpass } from '@/import/utils/overpass-import'
+import { buildGeometryQuery } from '@/import/utils/overpass-import'
+import { fetchOverpass } from '@/import/utils/retry'
 import type { ParsedGeometry } from '@/types/import.types'
 
 /**
@@ -336,9 +337,13 @@ export function fetchGeometryBatch(relationIds: number[]): Effect.Effect<ParsedG
       return []
     }
 
-    console.log(`Fetching geometry for ${relationIds.length} relations...`)
+    const startTime = Date.now()
+    console.log(`[Geometry] Fetching geometry for ${relationIds.length} relations...`)
 
     const query = buildGeometryQuery(relationIds)
+    console.log(
+      `[OverpassAPI] Query: geometry-batch relations=${relationIds.length} ids=${relationIds.slice(0, 3).join(',')}${relationIds.length > 3 ? '...' : ''}`,
+    )
     const data = (yield* fetchOverpass(query)) as unknown as {
       elements: Array<{
         type: string
@@ -350,7 +355,8 @@ export function fetchGeometryBatch(relationIds: number[]): Effect.Effect<ParsedG
     }
 
     if (!data.elements || data.elements.length === 0) {
-      console.warn('No elements returned from Overpass API')
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+      console.warn(`[Geometry] No elements returned from Overpass API (${duration}s)`)
       return []
     }
 
@@ -391,7 +397,7 @@ export function fetchGeometryBatch(relationIds: number[]): Effect.Effect<ParsedG
       const geometry = parseRelationGeometry(el, waysMap)
 
       if (!geometry) {
-        console.warn(`Failed to parse geometry for relation ${el.id} (${name})`)
+        console.warn(`[Geometry] Failed to parse geometry for relation ${el.id} (${name})`)
         continue
       }
 
@@ -405,7 +411,10 @@ export function fetchGeometryBatch(relationIds: number[]): Effect.Effect<ParsedG
       })
     }
 
-    console.log(`Successfully parsed ${results.length} relations with geometry`)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(
+      `[Geometry] Successfully parsed ${results.length} relations with geometry (${duration}s)`,
+    )
 
     return results
   })
@@ -416,27 +425,36 @@ export function fetchGeometryBatch(relationIds: number[]): Effect.Effect<ParsedG
  */
 export function fetchAllGeometry(relationIds: number[]): Effect.Effect<ParsedGeometry[], Error> {
   return Effect.gen(function* () {
+    const startTime = Date.now()
     const allResults: ParsedGeometry[] = []
+    const totalBatches = Math.ceil(relationIds.length / BATCH_SIZES.OVERPASS_GEOMETRY)
 
     for (let i = 0; i < relationIds.length; i += BATCH_SIZES.OVERPASS_GEOMETRY) {
       const batch = relationIds.slice(i, i + BATCH_SIZES.OVERPASS_GEOMETRY)
+      const batchNum = Math.floor(i / BATCH_SIZES.OVERPASS_GEOMETRY) + 1
       console.log(
-        `Processing geometry batch ${Math.floor(i / BATCH_SIZES.OVERPASS_GEOMETRY) + 1}...`,
+        `[Geometry] Batch ${batchNum}/${totalBatches}: Fetching ${batch.length} relations...`,
       )
 
       const results = yield* fetchGeometryBatch(batch)
       allResults.push(...results)
 
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+      console.log(`[Geometry] Batch ${batchNum}/${totalBatches} complete (${duration}s total)`)
+
       // Rate limiting between batches
       if (i + BATCH_SIZES.OVERPASS_GEOMETRY < relationIds.length) {
-        console.log(
-          `[Rate Limiter] Waiting ${DELAYS.OVERPASS_GEOMETRY_MS}ms before next geometry batch (Overpass API cool-down)`,
-        )
+        const delaySeconds = DELAYS.OVERPASS_GEOMETRY_MS / 1000
+        console.log(`[RateLimiter] Waiting ${delaySeconds}s before next geometry batch`)
         yield* Effect.sleep(`${DELAYS.OVERPASS_GEOMETRY_MS} millis`)
+        console.log(`[RateLimiter] Wait complete, resuming`)
       }
     }
 
-    console.log(`Fetched geometry for ${allResults.length} relations`)
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(
+      `[Geometry] Fetched geometry for ${allResults.length} relations (total: ${totalDuration}s)`,
+    )
 
     return allResults
   })

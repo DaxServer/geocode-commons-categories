@@ -32,6 +32,8 @@ function buildBoundaryQuery(countryCode?: string, adminLevels?: number[]): strin
     out bb;
   `
 
+  console.log(query)
+
   return query
 }
 
@@ -152,7 +154,6 @@ export const fetchBoundaries = (
   return Effect.gen(function* () {
     const query = buildBoundaryQuery(countryCode, adminLevels)
     console.log(`Fetching boundaries${countryCode ? ` for ${countryCode}` : ' globally'}...`)
-    console.log(`Query: ${query}`)
 
     const data = yield* fetchBoundariesFromAPI(query)
 
@@ -200,6 +201,7 @@ export const fetchBoundariesByBBox = (
     `
 
     console.log(`Fetching boundaries for bbox: ${south},${west},${north},${east}`)
+    console.log(query)
 
     const data = yield* fetchBoundariesFromAPI(query)
 

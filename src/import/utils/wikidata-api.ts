@@ -3,13 +3,11 @@
  */
 
 import { Effect } from 'effect'
-import { BATCH_SIZES, DELAYS } from '@/import/constants'
+import { BATCH_SIZES, DELAYS, USER_AGENT } from '@/import/constants'
 import { processInBatches } from '@/import/utils/batch'
 import { tryAsync } from '@/import/utils/effect-helpers'
 
 const WIKIDATA_API_ENDPOINT = 'https://www.wikidata.org/w/api.php'
-const USER_AGENT =
-  'Wikimedia Commons / User:DaxServer / geocode-commons-categories/1.0 (https://github.com/DaxServer/geocode-commons-categories)'
 
 /**
  * Wikidata API entity response
@@ -43,14 +41,21 @@ export const fetchWikimediaCategoriesBatch = (
   const uniqueIds = [...new Set(wikidataIds)].filter((id) => id && id.length > 0)
 
   return Effect.gen(function* () {
-    console.log(`Fetching Commons categories for ${uniqueIds.length} unique Wikidata IDs...`)
+    const startTime = Date.now()
+    const totalBatches = Math.ceil(uniqueIds.length / batchSize)
+    console.log(
+      `[Wikidata] Fetching Commons categories for ${uniqueIds.length} unique Wikidata IDs in ${totalBatches} batches`,
+    )
 
     const batchResults = yield* processInBatches(
       uniqueIds,
       batchSize,
       (batch, batchNum) =>
         Effect.gen(function* () {
+          const batchStartTime = Date.now()
           const categoryMap = new Map<string, string>()
+
+          console.log(`[Wikidata] Batch ${batchNum}/${totalBatches}: Fetching ${batch.length} IDs`)
 
           const batchResult = yield* tryAsync(async () => {
             const url = new URL(WIKIDATA_API_ENDPOINT)
@@ -74,19 +79,19 @@ export const fetchWikimediaCategoriesBatch = (
             return (await response.json()) as WikidataApiResponse
           }).pipe(
             Effect.catchAll((error) => {
-              console.error(`Error processing batch ${batchNum}:`, error)
+              console.error(`[Wikidata] Error processing batch ${batchNum}:`, error)
               return Effect.succeed({ entities: {} })
             }),
           )
 
           if (!batchResult.entities) {
-            console.warn(`No entities in batch ${batchNum} response`)
+            console.warn(`[Wikidata] No entities in batch ${batchNum} response`)
             return categoryMap
           }
 
           for (const [id, entity] of Object.entries(batchResult.entities)) {
             if ('missing' in entity) {
-              console.debug(`Wikidata entity ${id} not found`)
+              console.debug(`[Wikidata] Entity ${id} not found`)
               continue
             }
 
@@ -96,17 +101,21 @@ export const fetchWikimediaCategoriesBatch = (
             if (category) {
               categoryMap.set(id, category)
             } else {
-              console.debug(`No Commons category (P373) for ${id}`)
+              console.debug(`[Wikidata] No Commons category (P373) for ${id}`)
             }
           }
 
-          console.log(`Batch ${batchNum} complete: ${categoryMap.size} categories fetched`)
+          const batchDuration = ((Date.now() - batchStartTime) / 1000).toFixed(1)
+          console.log(
+            `[Wikidata] Batch ${batchNum}/${totalBatches} complete: ${categoryMap.size} categories fetched (${batchDuration}s)`,
+          )
+
           return categoryMap
         }),
       {
         delayMs: DELAYS.RATE_LIMIT_MS,
         onProgress: (batchNum, totalBatches) =>
-          console.log(`Processing batch ${batchNum}/${totalBatches}...`),
+          console.log(`[Wikidata] Processing batch ${batchNum}/${totalBatches}...`),
       },
     )
 
@@ -117,7 +126,10 @@ export const fetchWikimediaCategoriesBatch = (
       }
     }
 
-    console.log(`Total Commons categories fetched: ${finalMap.size}/${uniqueIds.length}`)
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(
+      `[Wikidata] Total Commons categories fetched: ${finalMap.size}/${uniqueIds.length} (${totalDuration}s)`,
+    )
     return finalMap
   })
 }

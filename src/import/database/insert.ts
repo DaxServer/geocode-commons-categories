@@ -15,6 +15,7 @@ export const batchInsertRelations = (
   relations: OSMRelation[],
 ): Effect.Effect<{ inserted: number; updated: number }, Error> => {
   return Effect.gen(function* () {
+    const startTime = Date.now()
     const pool: Pool = getPool()
 
     const client = yield* tryAsync(async () => pool.connect())
@@ -58,6 +59,9 @@ export const batchInsertRelations = (
       }
 
       yield* tryAsync(async () => client.query('COMMIT'))
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+      console.log(`[Database] Inserted ${inserted} and updated ${updated} relations (${duration}s)`)
 
       return { inserted, updated }
     } catch (error) {

@@ -161,7 +161,7 @@ export const initializeProgress = (countryCode: string): Effect.Effect<void, Err
       ),
     )
 
-    console.log(`Initialized progress tracking for ${countryCode}`)
+    console.log(`[Database] Initialized progress tracking for ${countryCode}`)
   })
 }
 
@@ -227,7 +227,7 @@ export const updateProgress = (
 export const markCompleted = (countryCode: string): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
     yield* updateProgress(countryCode, { status: 'completed' })
-    console.log(`Marked ${countryCode} as completed`)
+    console.log(`[Database] Marked ${countryCode} as completed`)
   })
 }
 
@@ -237,7 +237,7 @@ export const markCompleted = (countryCode: string): Effect.Effect<void, Error> =
 export const markFailed = (countryCode: string, error: string): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
     yield* updateProgress(countryCode, { status: 'failed', lastError: error })
-    console.error(`Marked ${countryCode} as failed: ${error}`)
+    console.error(`[Database] Marked ${countryCode} as failed: ${error}`)
   })
 }
 
