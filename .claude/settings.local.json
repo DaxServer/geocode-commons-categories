@@ -16,7 +16,8 @@
       "Bash(bun typecheck *)",
       "Bash(bun lint *)",
       "Bash(bun biome *)",
-      "Bash(but status *)"
+      "Bash(but status *)",
+      "Bash(but push *)"
     ]
   }
 }

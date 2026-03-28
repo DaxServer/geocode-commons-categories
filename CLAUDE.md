@@ -361,7 +361,7 @@ docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
 
 ## Environment Variables
 
-Env var types are declared in `env.d.ts` (project root) via `declare module 'bun' { interface Env { ... } }`. Add new env vars there — required vars typed as `string`, optional as `string | undefined`. This allows dot notation on `Bun.env` despite `noPropertyAccessFromIndexSignature`.
+Env var types are declared in `env.d.ts` (project root) via `declare module 'bun' { interface Env { ... } }`. Add new env vars there — required vars typed as `string`, optional as `string | undefined`. This allows dot notation on `Bun.env` despite `noPropertyAccessFromIndexSignature`. **`env.d.ts` already exists — never recreate it, only add to it.**
 
 ## Nominatim Integration
 
@@ -387,15 +387,6 @@ The `/geocode` endpoint queries a Nominatim PostgreSQL instance directly at runt
 - Uses `@bogeychan/elysia-logger` (pino) — `ctx.log` available in route handlers
 - Use `log.child({ lat, lon })` to bind request coordinates to all downstream log calls
 - `log` is not available in Elysia's `onError` handler — use `console.error` there
-
-## GitButler Workflow
-
-This project uses GitButler CLI (`but`) for all version control operations - **never use standard git commands**
-- `but status` - Check unstaged changes and branch status
-- `but commit -c -m "message" branch-name` - Create new branch and commit unassigned changes
-- `but commit -m "message" branch-name` - Add commit to existing branch (stage files first with `but stage`)
-- `but push branch-name` - Push branch to remote
-- `but pr new branch-name -t` - Create PR using commit message for title
 
 ## Working with Temporary Files
 
