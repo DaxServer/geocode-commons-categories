@@ -359,14 +359,34 @@ docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
 - Use `IF NOT EXISTS` in migrations for idempotency (safe to re-run with fresh volumes)
 - Always test Docker changes with `docker compose down -v && docker compose up -d` before committing
 
-## GitButler Workflow
+## Environment Variables
 
-This project uses GitButler CLI (`but`) for all version control operations - **never use standard git commands**
-- `but status` - Check unstaged changes and branch status
-- `but commit -c -m "message" branch-name` - Create new branch and commit unassigned changes
-- `but commit -m "message" branch-name` - Add commit to existing branch (stage files first with `but stage`)
-- `but push branch-name` - Push branch to remote
-- `but pr new branch-name -t` - Create PR using commit message for title
+Env var types are declared in `env.d.ts` (project root) via `declare module 'bun' { interface Env { ... } }`. Add new env vars there — required vars typed as `string`, optional as `string | undefined`. This allows dot notation on `Bun.env` despite `noPropertyAccessFromIndexSignature`. **`env.d.ts` already exists — never recreate it, only add to it.**
+
+## Nominatim Integration
+
+The `/geocode` endpoint queries a Nominatim PostgreSQL instance directly at runtime — no pre-import needed.
+
+### Connection
+- Configure via `NOMINATIM_DATABASE_URL` environment variable
+- Queries the `placex` table (Nominatim's main places table)
+
+### Core Query Pattern
+- `ST_Contains(geometry, ST_SetSRID(ST_MakePoint(lon, lat), 4326))` — point-in-polygon
+- `extratags ? 'wikidata'` — only rows with a Wikidata ID
+- `linked_place_id IS NULL` — exclude duplicates linked to a parent place
+- `ORDER BY ST_Area(geometry) ASC` — smallest (most specific) boundary first
+- **Do not cast to `::geography`** for `ST_Area` in ORDER BY — it's 2x slower with no benefit for relative ordering
+
+### Commons Category Resolution
+- `extratags->'wikimedia_commons'` contains the category **with** `Category:` prefix — strip it before use
+- If absent, fall back to Wikidata API (P373 claim, then commonswiki sitelink)
+- Wikidata results are cached in-memory (`categoryCache` Map)
+
+### Logging
+- Uses `@bogeychan/elysia-logger` (pino) — `ctx.log` available in route handlers
+- Use `log.child({ lat, lon })` to bind request coordinates to all downstream log calls
+- `log` is not available in Elysia's `onError` handler — use `console.error` there
 
 ## Working with Temporary Files
 

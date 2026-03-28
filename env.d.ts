@@ -1,6 +1,7 @@
 declare module 'bun' {
   interface Env {
     DATABASE_URL: string
+    NOMINATIM_DATABASE_URL: string
     PORT?: string
     HOST?: string
     // Import script environment variables
