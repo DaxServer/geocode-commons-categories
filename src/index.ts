@@ -1,15 +1,17 @@
+import { logger } from '@bogeychan/elysia-logger'
 import { Effect } from 'effect'
 import { Elysia, t } from 'elysia'
 import { config } from '@/config/env'
 import { runMigrationsIfNeeded } from '@/db/migrate'
-import { reverseGeocode } from '@/services/geocode.service'
+import { reverseGeocode } from '@/services/nominatim.service'
 import { NotFoundError } from '@/types/errors'
 import { coordinateSchema, geocodeResponseSchema } from '@/types/geocode.types'
 
 new Elysia()
+  .use(logger())
   .get(
     '/geocode',
-    async ({ query }) => await Effect.runPromise(reverseGeocode(query.lat, query.lon)),
+    async ({ query, log }) => await Effect.runPromise(reverseGeocode(query.lat, query.lon, log)),
     {
       query: coordinateSchema,
       response: geocodeResponseSchema,
@@ -17,12 +19,12 @@ new Elysia()
   )
   .post(
     '/geocode',
-    async ({ body }) => {
+    async ({ body, log }) => {
       const results = []
 
       for (const coords of body) {
         const result = await Effect.runPromise(
-          Effect.catchAll(() => Effect.succeed(null))(reverseGeocode(coords.lat, coords.lon)),
+          Effect.catchAll(() => Effect.succeed(null))(reverseGeocode(coords.lat, coords.lon, log)),
         )
         if (result) {
           results.push(result)
@@ -40,7 +42,7 @@ new Elysia()
     NOT_FOUND: NotFoundError,
   })
   .onError(({ code, error }) => {
-    console.error('Error:', error)
+    console.error('Request error', { code, error })
     if (code === 'NOT_FOUND') {
       return new Response(JSON.stringify({ error: 'Location not found' }), {
         status: 404,

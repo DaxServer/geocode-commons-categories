@@ -2,20 +2,21 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "Bash(bun:*)",
-      "Bash(curl:*)",
       "mcp__plugin_context7_context7__resolve-library-id",
       "mcp__plugin_context7_context7__query-docs",
-      "Bash(tree:*)",
-      "Bash(but:*)",
-      "Bash(docker compose:*)",
-      "Bash(docker volume rm:*)",
-      "Bash(gh pr checks:*)",
-      "Bash(gh pr view:*)",
-      "Bash(wc:*)",
-      "Bash(grep:*)",
-      "Bash(gh pr list:*)",
-      "Bash(gh api:*)"
+      "Bash(tree *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr view *)",
+      "Bash(wc *)",
+      "Bash(grep *)",
+      "Bash(gh pr list *)",
+      "WebFetch(domain:geocoding.daxserver.com)",
+      "WebFetch(domain:edwardbetts.com)",
+      "Bash(brew list *)",
+      "Bash(bun typecheck *)",
+      "Bash(bun lint *)",
+      "Bash(bun biome *)",
+      "Bash(but status *)"
     ]
   }
 }

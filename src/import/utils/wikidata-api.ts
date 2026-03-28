@@ -3,11 +3,9 @@
  */
 
 import { Effect } from 'effect'
-import { BATCH_SIZES, DELAYS, USER_AGENT } from '@/import/constants'
+import { BATCH_SIZES, DELAYS, USER_AGENT, WIKIDATA_API_ENDPOINT } from '@/import/constants'
 import { processInBatches } from '@/import/utils/batch'
 import { tryAsync } from '@/import/utils/effect-helpers'
-
-const WIKIDATA_API_ENDPOINT = 'https://www.wikidata.org/w/api.php'
 
 /**
  * Wikidata API entity response
