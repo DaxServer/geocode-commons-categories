@@ -31,6 +31,10 @@ function getNominatimPool(): Pool {
   return nominatimPool
 }
 
+export async function closeNominatimPool(): Promise<void> {
+  await nominatimPool?.end()
+}
+
 function stripCategoryPrefix(category?: string | null): string | null {
   return category?.startsWith(COMMONS_PREFIX) ? category.slice(COMMONS_PREFIX.length) : null
 }
