@@ -26,7 +26,8 @@ function importCountry(
   adminLevelRange: { min: number; max: number },
 ): Effect.Effect<void, Error> {
   return Effect.gen(function* () {
-    console.log(`\n=== Starting import for ${iso3Code} ===`)
+    const startTime = Date.now()
+    console.log(`\n[Import] Starting import for ${iso3Code}`)
 
     // Initialize progress tracking
     yield* initializeProgress(iso3Code)
@@ -70,7 +71,7 @@ function importCountry(
       const insertResult = yield* batchInsertRelations(relations)
 
       console.log(
-        `Inserted ${insertResult.inserted} and updated ${insertResult.updated} relations for ${iso3Code} at level ${level}`,
+        `[Import] Inserted ${insertResult.inserted} and updated ${insertResult.updated} relations for ${iso3Code} at level ${level}`,
       )
 
       totalRelationsInserted += insertResult.inserted + insertResult.updated
@@ -87,11 +88,12 @@ function importCountry(
 
     // Show final stats
     const stats = yield* getCountryStats(iso3Code)
-    console.log(`\n=== Import complete for ${iso3Code} ===`)
-    console.log(`Total relations: ${stats.totalRelations}`)
-    console.log(`By admin level:`)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`\n[Import] Completed ${iso3Code} import (total: ${duration}s)`)
+    console.log(`[Import] Total relations: ${stats.totalRelations}`)
+    console.log(`[Import] By admin level:`)
     for (const levelStat of stats.byAdminLevel) {
-      console.log(`  Level ${levelStat.adminLevel}: ${levelStat.count}`)
+      console.log(`[Import]   Level ${levelStat.adminLevel}: ${levelStat.count}`)
     }
   })
 }
@@ -124,12 +126,12 @@ export const importAllCountries = (adminLevelRange: {
   max: number
 }): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
-    console.log('=== Starting import for all countries ===')
+    console.log('[Import] Starting import for all countries')
 
     const allCodes = getSortedCountryCodes()
-    console.log(`Importing ${allCodes.length} countries...`)
+    console.log(`[Import] Importing ${allCodes.length} countries`)
 
-    console.log(`Admin level range: ${adminLevelRange.min} to ${adminLevelRange.max}`)
+    console.log(`[Import] Admin level range: ${adminLevelRange.min} to ${adminLevelRange.max}`)
 
     // Process in batches
     const batches = batchCountryCodes(IMPORT.COUNTRY_BATCH_SIZE)
@@ -143,14 +145,14 @@ export const importAllCountries = (adminLevelRange: {
 
       // Rate limiting between batches
       if (i < batches.length - 1) {
-        console.log(
-          `[Rate Limiter] Waiting ${DELAYS.COUNTRY_BATCH_MS}ms before next country batch (Overpass API cool-down)`,
-        )
+        const delaySeconds = DELAYS.COUNTRY_BATCH_MS / 1000
+        console.log(`[RateLimiter] Waiting ${delaySeconds}s before next country batch`)
         yield* Effect.sleep(`${DELAYS.COUNTRY_BATCH_MS} millis`)
+        console.log(`[RateLimiter] Wait complete, resuming`)
       }
     }
 
-    console.log('\n=== Import complete for all countries ===')
+    console.log('\n[Import] Import complete for all countries')
   })
 }
 
@@ -162,11 +164,11 @@ export const importSingleCountry = (
   adminLevelRange: { min: number; max: number },
 ): Effect.Effect<void, Error> => {
   return Effect.gen(function* () {
-    console.log(`=== Starting single country import for ${iso3Code} ===`)
+    console.log(`[Import] Starting single country import for ${iso3Code}`)
 
     yield* importCountry(iso3Code, adminLevelRange)
 
-    console.log(`\n=== Single country import complete for ${iso3Code} ===`)
+    console.log(`\n[Import] Single country import complete for ${iso3Code}`)
   })
 }
 
@@ -175,13 +177,13 @@ if (import.meta.main) {
   const countryCode = Bun.env.COUNTRY_CODE
   const adminLevelRange = getAdminLevelRange()
 
-  console.log(`Admin level range: ${adminLevelRange.min} to ${adminLevelRange.max}`)
+  console.log(`[Import] Admin level range: ${adminLevelRange.min} to ${adminLevelRange.max}`)
 
   if (countryCode) {
-    console.log(`Importing single country: ${countryCode}`)
+    console.log(`[Import] Importing single country: ${countryCode}`)
     Effect.runPromise(importSingleCountry(countryCode, adminLevelRange))
   } else {
-    console.log('Importing all countries...')
+    console.log('[Import] Importing all countries')
     Effect.runPromise(importAllCountries(adminLevelRange))
   }
 }

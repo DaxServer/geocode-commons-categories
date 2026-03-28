@@ -18,7 +18,7 @@ import type { AdminBoundaryImport, ImportConfig, ImportStats } from '@/types/imp
 
 function displayConfig(config: ImportConfig): void {
   console.log('╔════════════════════════════════════════════════════════════╗')
-  console.log('║   Administrative Boundary Data Import System            ║')
+  console.log('║         Administrative Boundary Data Import System         ║')
   console.log('╚════════════════════════════════════════════════════════════╝')
   console.log()
   console.log('Configuration:')

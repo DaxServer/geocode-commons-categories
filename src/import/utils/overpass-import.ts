@@ -63,19 +63,24 @@ export function fetchCountryLevelRelations(
   adminLevel: number,
 ): Effect.Effect<number[], Error> {
   return Effect.gen(function* () {
+    const startTime = Date.now()
     const query = buildCountryLevelQuery(iso3Code, adminLevel)
     const data = (yield* fetchOverpass(query)) as unknown as {
       elements: Array<{ type: string; id: number }>
     }
 
     if (!data.elements || data.elements.length === 0) {
-      console.log(`No relations found for ${iso3Code} at admin_level ${adminLevel}`)
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+      console.log(
+        `[OverpassAPI] No relations found for ${iso3Code} at admin_level ${adminLevel} (${duration}s)`,
+      )
       return []
     }
 
     const relationIds = data.elements.map((el: { type: string; id: number }) => el.id)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
     console.log(
-      `Found ${relationIds.length} relations for ${iso3Code} at admin_level ${adminLevel}`,
+      `[OverpassAPI] Found ${relationIds.length} relations for ${iso3Code} at admin_level ${adminLevel} (${duration}s)`,
     )
 
     return relationIds
@@ -90,6 +95,7 @@ export function fetchChildRelationIds(
   childLevel: number,
 ): Effect.Effect<number[], Error> {
   return Effect.gen(function* () {
+    const startTime = Date.now()
     const query = buildChildQuery(parentRelationId, childLevel)
     const data = (yield* fetchOverpass(query)) as unknown as {
       elements: Array<{ type: string; id: number }>
@@ -100,8 +106,9 @@ export function fetchChildRelationIds(
     }
 
     const relationIds = data.elements.map((el: { type: string; id: number }) => el.id)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
     console.log(
-      `Found ${relationIds.length} child relations for parent ${parentRelationId} at admin_level ${childLevel}`,
+      `[OverpassAPI] Found ${relationIds.length} child relations for parent ${parentRelationId} at admin_level ${childLevel} (${duration}s)`,
     )
 
     return relationIds
