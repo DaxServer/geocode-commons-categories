@@ -14,6 +14,7 @@ declare module 'vue' {
     Button: typeof import('primevue/button')['default']
     ComparePanel: typeof import('./src/components/ComparePanel.vue')['default']
     FloatLabel: typeof import('primevue/floatlabel')['default']
+    GeocodeResultCard: typeof import('./src/components/GeocodeResultCard.vue')['default']
     InputNumber: typeof import('primevue/inputnumber')['default']
     MapView: typeof import('./src/components/MapView.vue')['default']
     Message: typeof import('primevue/message')['default']

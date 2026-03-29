@@ -11,6 +11,11 @@ import { logger } from '@bogeychan/elysia-logger'
 import { Effect } from 'effect'
 import { Elysia, t } from 'elysia'
 
+// Helper to run Effect and return null on any error
+const runOrNull = async <A, E>(effect: Effect.Effect<A, E>): Promise<A | null> => {
+  return await Effect.runPromise(Effect.catchAll(() => Effect.succeed(null))(effect))
+}
+
 export const app = new Elysia()
   .use(logger())
   .get(
@@ -25,13 +30,7 @@ export const app = new Elysia()
     '/geocode',
     async ({ body, log }) => {
       const results = await Promise.all(
-        body.map((coords) =>
-          Effect.runPromise(
-            Effect.catchAll(() => Effect.succeed(null))(
-              reverseGeocode(coords.lat, coords.lon, log),
-            ),
-          ),
-        ),
+        body.map((coords) => runOrNull(reverseGeocode(coords.lat, coords.lon, log))),
       )
       return results.filter((r) => r !== null)
     },
@@ -46,10 +45,10 @@ export const app = new Elysia()
       const lat = query.lat
       const lon = query.lon
 
-      const ourResult = await Effect.runPromise(
-        Effect.catchAll((error) => {
+      const ourResult = await runOrNull(
+        Effect.tapError((error) => {
           log.warn({ error }, 'Our geocode failed')
-          return Effect.succeed(null)
+          return Effect.void
         })(reverseGeocode(lat, lon, log)),
       )
 
@@ -67,20 +66,20 @@ export const app = new Elysia()
       }
 
       const diff = {
-        wikidata_match: ourResult?.wikidata === edwardBettsResult?.wikidata,
-        commons_match: ourResult?.commons_cat?.title === edwardBettsResult?.commons_cat?.title,
-        admin_level_match: ourResult?.admin_level === edwardBettsResult?.admin_level,
         wikidata: {
           ours: ourResult?.wikidata ?? null,
           theirs: edwardBettsResult?.wikidata ?? null,
+          match: ourResult?.wikidata === edwardBettsResult?.wikidata,
         },
         commons: {
           ours: ourResult?.commons_cat?.title ?? null,
           theirs: edwardBettsResult?.commons_cat?.title ?? null,
+          match: ourResult?.commons_cat?.title === edwardBettsResult?.commons_cat?.title,
         },
         admin_level: {
           ours: ourResult?.admin_level ?? null,
           theirs: edwardBettsResult?.admin_level ?? null,
+          match: ourResult?.admin_level === edwardBettsResult?.admin_level,
         },
       }
 

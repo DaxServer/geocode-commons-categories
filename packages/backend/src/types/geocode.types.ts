@@ -7,16 +7,29 @@ export const coordinateSchema = t.Object({
 
 export type Coordinate = typeof coordinateSchema.static
 
+// Reusable shared schemas
+const commonsCategorySchema = t.Object({
+  title: t.String(),
+  url: t.String(),
+})
+
+const coordsSchema = t.Object({
+  lat: t.Number(),
+  lon: t.Number(),
+})
+
+// Helper for diff field comparisons (ours vs theirs with match flag)
+const diffFieldSchema = <T extends ReturnType<typeof t.String | typeof t.Number>>(valueSchema: T) =>
+  t.Object({
+    ours: t.Nullable(valueSchema),
+    theirs: t.Nullable(valueSchema),
+    match: t.Boolean(),
+  })
+
 export const geocodeResponseSchema = t.Object({
   admin_level: t.Number(),
-  commons_cat: t.Object({
-    title: t.String(),
-    url: t.String(),
-  }),
-  coords: t.Object({
-    lat: t.Number(),
-    lon: t.Number(),
-  }),
+  commons_cat: commonsCategorySchema,
+  coords: coordsSchema,
   wikidata: t.String(),
   name: t.Nullable(t.String()),
 })
@@ -32,14 +45,8 @@ export type AdminBoundaryRow = {
 
 export const edwardBettsResponseSchema = t.Object({
   admin_level: t.Number(),
-  commons_cat: t.Object({
-    title: t.String(),
-    url: t.String(),
-  }),
-  coords: t.Object({
-    lat: t.Number(),
-    lon: t.Number(),
-  }),
+  commons_cat: commonsCategorySchema,
+  coords: coordsSchema,
   wikidata: t.String(),
 })
 
@@ -49,21 +56,9 @@ export const geocodeCompareSchema = t.Object({
   ours: t.Nullable(geocodeResponseSchema),
   edwardBetts: t.Nullable(edwardBettsResponseSchema),
   diff: t.Object({
-    wikidata_match: t.Boolean(),
-    commons_match: t.Boolean(),
-    admin_level_match: t.Boolean(),
-    wikidata: t.Object({
-      ours: t.Nullable(t.String()),
-      theirs: t.Nullable(t.String()),
-    }),
-    commons: t.Object({
-      ours: t.Nullable(t.String()),
-      theirs: t.Nullable(t.String()),
-    }),
-    admin_level: t.Object({
-      ours: t.Nullable(t.Number()),
-      theirs: t.Nullable(t.Number()),
-    }),
+    wikidata: diffFieldSchema(t.String()),
+    commons: diffFieldSchema(t.String()),
+    admin_level: diffFieldSchema(t.Number()),
   }),
 })
 

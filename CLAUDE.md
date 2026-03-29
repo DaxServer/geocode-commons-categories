@@ -46,6 +46,7 @@ describe('fetchWithRetry', () => {
 - Import type declarations must precede value imports
 - Use single quotes for strings
 - `noUnusedVariables` is disabled for `*.vue` files (Biome can't see template usage from `<script setup>`)
+- `noUnusedImports` is also disabled for `*.vue` files for the same reason
 
 ## Project Structure
 
@@ -150,6 +151,7 @@ export class DatabaseError extends Error {
 ## Code Style Patterns
 
 - Use `type` aliases instead of `interface` declarations for type definitions
+- Frontend MUST NOT redefine types - use types exposed by Elysia Eden treaty from backend. Backend owns all types.
 - Access properties on `Record<string, string>` index signatures with bracket notation: `obj['key']` (required by TypeScript strict mode)
 - Biome's `useLiteralKeys` rule is disabled to avoid conflicts with TypeScript index signature requirements
 - **Functional composition preferred** over imperative control flow in business logic
@@ -234,7 +236,11 @@ The `/geocode` endpoint queries a Nominatim PostgreSQL instance directly at runt
 ### Commons Category Resolution
 - `extratags->'wikimedia_commons'` contains the category **with** `Category:` prefix — strip it before use
 - If absent, fall back to Wikidata API (P373 claim, then commonswiki sitelink)
+- If P373 and sitelink are missing, check P910 (topic's main category) property and fetch that entity's category
 - Wikidata results are cached in-memory (`categoryCache` Map)
+
+### Name Resolution
+- Use `COALESCE(name->'name:en', name->'name')` to get English name first, fallback to local name
 
 ### Logging
 - Uses `@bogeychan/elysia-logger` (pino) — `ctx.log` available in route handlers

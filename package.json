@@ -8,7 +8,7 @@
     "dev:backend": "bun --cwd packages/backend dev",
     "dev:dashboard": "bun --cwd packages/dashboard dev",
     "format": "bun biome format --write .",
-    "lint": "bun biome check .",
+    "lint": "bun biome check --write .",
     "typecheck": "concurrently \"bun --cwd packages/backend typecheck\" \"bun --cwd packages/dashboard typecheck\""
   },
   "workspaces": [

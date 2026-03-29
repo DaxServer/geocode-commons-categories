@@ -1,7 +1,14 @@
 <script setup lang="ts">
+import GeocodeResultCard from '@frontend/components/GeocodeResultCard.vue'
 import { useGeocodeStore } from '@frontend/stores/geocode'
 
 const store = useGeocodeStore()
+
+const diffTags = [
+  { key: 'wikidata', label: 'Wikidata' },
+  { key: 'commons', label: 'Commons' },
+  { key: 'admin_level', label: 'Admin level' },
+] as const
 </script>
 
 <template>
@@ -31,104 +38,43 @@ const store = useGeocodeStore()
             {{ store.compareResult.ours?.name ?? 'Unknown' }}
           </span>
           <span class="text-xs text-surface-400 font-mono">
-            {{ store.compareResult.ours?.coords.lat.toFixed(4) }},
-            {{ store.compareResult.ours?.coords.lon.toFixed(4) }}
+            {{ store.compareResult.ours?.coords.lat.toFixed(6) }},
+            {{ store.compareResult.ours?.coords.lon.toFixed(6) }}
           </span>
         </div>
         <div class="flex gap-2">
-          <Tag :severity="store.compareResult.diff.wikidata_match ? 'success' : 'danger'">
-            {{ store.compareResult.diff.wikidata_match ? '✓' : '✗' }} Wikidata
-          </Tag>
-          <Tag :severity="store.compareResult.diff.commons_match ? 'success' : 'danger'">
-            {{ store.compareResult.diff.commons_match ? '✓' : '✗' }} Commons
-          </Tag>
-          <Tag :severity="store.compareResult.diff.admin_level_match ? 'success' : 'danger'">
-            {{ store.compareResult.diff.admin_level_match ? '✓' : '✗' }} Admin level
+          <Tag
+            v-for="tag in diffTags"
+            :key="tag.key"
+            :severity="store.compareResult.diff[tag.key].match ? 'success' : 'danger'"
+          >
+            {{ store.compareResult.diff[tag.key].match ? '✓' : '✗' }} {{ tag.label }}
           </Tag>
         </div>
       </div>
 
       <!-- Side-by-side cards -->
       <div class="grid grid-cols-2 gap-4">
-
-        <!-- Ours -->
-        <div class="bg-surface-0 rounded-lg border-t-4 border-blue-500 shadow-sm p-4 flex flex-col gap-3">
-          <div class="text-xs font-bold tracking-widest text-blue-500 uppercase">Our Endpoint</div>
-
-          <div v-if="store.compareResult.ours">
-            <!-- Wikidata -->
-            <div :class="!store.compareResult.diff.wikidata_match ? 'bg-red-50 rounded p-2 -mx-1' : ''">
-              <div class="text-xs text-surface-400 mb-1">Wikidata</div>
-              <a
-                :href="`https://www.wikidata.org/wiki/${store.compareResult.ours.wikidata}`"
-                target="_blank"
-                class="text-sm text-surface-800 hover:text-blue-600"
-              >
-                {{ store.compareResult.ours.wikidata }} ↗
-              </a>
-            </div>
-
-            <!-- Commons -->
-            <div :class="!store.compareResult.diff.commons_match ? 'bg-red-50 rounded p-2 -mx-1 mt-2' : 'mt-2'">
-              <div class="text-xs text-surface-400 mb-1">Commons</div>
-              <a
-                :href="store.compareResult.ours.commons_cat.url"
-                target="_blank"
-                class="text-sm text-surface-800 hover:text-blue-600"
-              >
-                {{ store.compareResult.ours.commons_cat.title }} ↗
-              </a>
-            </div>
-
-            <!-- Admin level -->
-            <div :class="!store.compareResult.diff.admin_level_match ? 'bg-red-50 rounded p-2 -mx-1 mt-2' : 'mt-2'">
-              <div class="text-xs text-surface-400 mb-1">Admin level</div>
-              <div class="text-sm text-surface-800">{{ store.compareResult.ours.admin_level }}</div>
-            </div>
-          </div>
-
-          <div v-else class="text-sm text-surface-400">No result</div>
-        </div>
-
-        <!-- Edward Betts -->
-        <div class="bg-surface-0 rounded-lg border-t-4 border-violet-500 shadow-sm p-4 flex flex-col gap-3">
-          <div class="text-xs font-bold tracking-widest text-violet-500 uppercase">Edward Betts</div>
-
-          <div v-if="store.compareResult.edwardBetts">
-            <!-- Wikidata -->
-            <div :class="!store.compareResult.diff.wikidata_match ? 'bg-red-50 rounded p-2 -mx-1' : ''">
-              <div class="text-xs text-surface-400 mb-1">Wikidata</div>
-              <a
-                :href="`https://www.wikidata.org/wiki/${store.compareResult.edwardBetts.wikidata}`"
-                target="_blank"
-                class="text-sm text-surface-800 hover:text-blue-600"
-              >
-                {{ store.compareResult.edwardBetts.wikidata }} ↗
-              </a>
-            </div>
-
-            <!-- Commons -->
-            <div :class="!store.compareResult.diff.commons_match ? 'bg-red-50 rounded p-2 -mx-1 mt-2' : 'mt-2'">
-              <div class="text-xs text-surface-400 mb-1">Commons</div>
-              <a
-                :href="store.compareResult.edwardBetts.commons_cat.url"
-                target="_blank"
-                class="text-sm text-surface-800 hover:text-blue-600"
-              >
-                {{ store.compareResult.edwardBetts.commons_cat.title }} ↗
-              </a>
-            </div>
-
-            <!-- Admin level -->
-            <div :class="!store.compareResult.diff.admin_level_match ? 'bg-red-50 rounded p-2 -mx-1 mt-2' : 'mt-2'">
-              <div class="text-xs text-surface-400 mb-1">Admin level</div>
-              <div class="text-sm text-surface-800">{{ store.compareResult.edwardBetts.admin_level }}</div>
-            </div>
-          </div>
-
-          <div v-else class="text-sm text-surface-400">No result</div>
-        </div>
-
+        <GeocodeResultCard
+          title="Our Endpoint"
+          header-color="blue"
+          :result="store.compareResult.ours"
+          :show-mismatch-highlight="{
+            wikidata: store.compareResult.diff.wikidata.match,
+            commons: store.compareResult.diff.commons.match,
+            adminLevel: store.compareResult.diff.admin_level.match,
+          }"
+        />
+        <GeocodeResultCard
+          title="Edward Betts"
+          header-color="violet"
+          :result="store.compareResult.edwardBetts"
+          :show-mismatch-highlight="{
+            wikidata: store.compareResult.diff.wikidata.match,
+            commons: store.compareResult.diff.commons.match,
+            adminLevel: store.compareResult.diff.admin_level.match,
+          }"
+        />
       </div>
     </template>
   </div>
