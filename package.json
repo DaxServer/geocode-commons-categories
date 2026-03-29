@@ -1,35 +1,45 @@
 {
   "name": "geocode-commons-categories",
-  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "bun --hot src/index.ts",
+    "dev": "concurrently \"bun --cwd packages/backend dev\" \"bun --cwd packages/dashboard dev\"",
+    "dev:backend": "bun --cwd packages/backend dev",
+    "dev:dashboard": "bun --cwd packages/dashboard dev",
     "format": "bun biome format --write .",
-    "format:check": "bun biome format --write . && bun biome check .",
     "lint": "bun biome check .",
-    "import": "bun src/import/import.ts",
-    "typecheck": "bun --bun tsc --noEmit"
+    "typecheck": "concurrently \"bun --cwd packages/backend typecheck\" \"bun --cwd packages/dashboard typecheck\""
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
-    "@types/bun": "1.3.11",
+    "@types/bun": "^1.3.11",
     "@types/geojson": "^7946.0.16",
-    "@types/pg": "^8.20.0",
+    "concurrently": "^9.2.1",
     "geojson": "^0.5.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5.9.3"
   },
   "engines": {
     "bun": "1.3.11"
   },
-  "dependencies": {
-    "@bogeychan/elysia-logger": "^0.1.10",
+  "catalog": {
+    "@elysiajs/eden": "^1.4.8",
+    "@primeuix/themes": "^2.0.3",
+    "@tailwindcss/vite": "^4.2.2",
+    "@vitejs/plugin-vue": "^6.0.5",
     "effect": "^3.21.0",
     "elysia": "^1.4.28",
-    "pg": "^8.20.0",
-    "pino": "^10.3.1"
+    "maplibre-gl": "^5.21.1",
+    "pinia": "^3.0.4",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.4",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "unplugin-vue-components": "^32.0.0",
+    "vite": "^8.0.3",
+    "vue": "^3.5.31",
+    "vue-tsc": "^3.2.6"
   }
 }

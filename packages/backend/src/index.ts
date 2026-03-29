@@ -1,0 +1,142 @@
+import { closeNominatimPool, reverseGeocode } from '@backend/services/nominatim.service'
+import { NotFoundError } from '@backend/types/errors'
+import {
+  coordinateSchema,
+  type EdwardBettsResponse,
+  type GeocodeCompareResponse,
+  geocodeCompareSchema,
+  geocodeResponseSchema,
+} from '@backend/types/geocode.types'
+import { logger } from '@bogeychan/elysia-logger'
+import { Effect } from 'effect'
+import { Elysia, t } from 'elysia'
+
+export const app = new Elysia()
+  .use(logger())
+  .get(
+    '/geocode',
+    async ({ query, log }) => await Effect.runPromise(reverseGeocode(query.lat, query.lon, log)),
+    {
+      query: coordinateSchema,
+      response: geocodeResponseSchema,
+    },
+  )
+  .post(
+    '/geocode',
+    async ({ body, log }) => {
+      const results = await Promise.all(
+        body.map((coords) =>
+          Effect.runPromise(
+            Effect.catchAll(() => Effect.succeed(null))(
+              reverseGeocode(coords.lat, coords.lon, log),
+            ),
+          ),
+        ),
+      )
+      return results.filter((r) => r !== null)
+    },
+    {
+      body: t.Array(coordinateSchema),
+      response: t.Array(geocodeResponseSchema),
+    },
+  )
+  .get(
+    '/geocode/compare',
+    async ({ query, log }): Promise<GeocodeCompareResponse> => {
+      const lat = query.lat
+      const lon = query.lon
+
+      const ourResult = await Effect.runPromise(
+        Effect.catchAll((error) => {
+          log.warn({ error }, 'Our geocode failed')
+          return Effect.succeed(null)
+        })(reverseGeocode(lat, lon, log)),
+      )
+
+      const edwardBettsUrl = `https://edwardbetts.com/geocode/?lat=${lat}&lon=${lon}`
+      let edwardBettsResult: EdwardBettsResponse | null = null
+      try {
+        const response = await fetch(edwardBettsUrl)
+        if (response.ok) {
+          edwardBettsResult = (await response.json()) as EdwardBettsResponse
+        } else {
+          log.warn({ status: response.status }, 'Edward Betts request failed')
+        }
+      } catch (error) {
+        log.warn({ error }, 'Failed to fetch from Edward Betts')
+      }
+
+      const diff = {
+        wikidata_match: ourResult?.wikidata === edwardBettsResult?.wikidata,
+        commons_match: ourResult?.commons_cat?.title === edwardBettsResult?.commons_cat?.title,
+        admin_level_match: ourResult?.admin_level === edwardBettsResult?.admin_level,
+        wikidata: {
+          ours: ourResult?.wikidata ?? null,
+          theirs: edwardBettsResult?.wikidata ?? null,
+        },
+        commons: {
+          ours: ourResult?.commons_cat?.title ?? null,
+          theirs: edwardBettsResult?.commons_cat?.title ?? null,
+        },
+        admin_level: {
+          ours: ourResult?.admin_level ?? null,
+          theirs: edwardBettsResult?.admin_level ?? null,
+        },
+      }
+
+      return {
+        ours: ourResult,
+        edwardBetts: edwardBettsResult,
+        diff,
+      }
+    },
+    {
+      query: coordinateSchema,
+      response: geocodeCompareSchema,
+    },
+  )
+  .error({
+    NOT_FOUND: NotFoundError,
+  })
+  .onError(({ code, error }) => {
+    console.error('Request error', { code, error })
+    if (code === 'NOT_FOUND') {
+      return new Response(JSON.stringify({ error: 'Location not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  })
+  .listen(3000, ({ hostname, port }) => {
+    console.log(`🦊 Elysia is running at http://${hostname}:${port}`)
+  })
+
+export type App = typeof app
+
+let forceExitTimer: ReturnType<typeof setTimeout> | null = null
+
+const shutdown = async (signal: string) => {
+  console.log(`\n${signal} received, shutting down gracefully...`)
+
+  forceExitTimer = setTimeout(() => {
+    console.error('Forced exit after timeout')
+    process.exit(1)
+  }, 10000)
+
+  await closeNominatimPool()
+  await app.stop()
+
+  if (forceExitTimer) {
+    clearTimeout(forceExitTimer)
+  }
+
+  console.log('Shutdown complete')
+  process.exit(0)
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))
