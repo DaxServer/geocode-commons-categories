@@ -7,7 +7,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Effect } from 'effect'
 import { Pool } from 'pg'
-import { tryAsync } from '@/import/utils/effect-helpers'
+import { tryAsync } from '@/utils/effect'
 
 /**
  * Extract search_path from DATABASE_URL options parameter
