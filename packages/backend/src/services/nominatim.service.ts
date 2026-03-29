@@ -58,43 +58,49 @@ async function fetchCommonsCategories(wikidataIds: string[], log: Logger): Promi
 
     log.info({ ids: chunk.length }, 'Fetching Commons categories from Wikidata (batch)')
     const t0 = Date.now()
-    const response = await fetch(url.toString(), { headers: { 'User-Agent': USER_AGENT } })
-    if (!response.ok) {
-      log.warn({ status: response.status, ids: chunk }, 'Wikidata API batch request failed')
-      // Set all missing ids in this chunk to null in cache
-      for (const id of chunk) {
-        categoryCache.set(id, null)
+    try {
+      const response = await fetch(url.toString(), { headers: { 'User-Agent': USER_AGENT } })
+      if (!response.ok) {
+        log.warn({ status: response.status, ids: chunk }, 'Wikidata API batch request failed')
+        for (const id of chunk) {
+          categoryCache.set(id, null)
+        }
+        continue
       }
-      continue
-    }
 
-    const data = (await response.json()) as WikidataApiResponse
-    const entities = data.entities ?? {}
+      const data = (await response.json()) as WikidataApiResponse
+      const entities = data.entities ?? {}
 
-    for (const id of chunk) {
-      const entity = entities[id]
-      if (!entity || entity.missing !== undefined) {
-        log.warn({ wikidataId: id }, 'Wikidata entity not found in batch')
-        categoryCache.set(id, null)
-      } else {
-        const p373Value = entity.claims?.P373?.[0]?.mainsnak?.datavalue?.value
-        if (p373Value) {
-          log.debug({ wikidataId: id, commons: p373Value }, 'Resolved via P373 claim (batch)')
-          categoryCache.set(id, p373Value)
+      for (const id of chunk) {
+        const entity = entities[id]
+        if (!entity || entity.missing !== undefined) {
+          log.warn({ wikidataId: id }, 'Wikidata entity not found in batch')
+          categoryCache.set(id, null)
         } else {
-          const sitelink = entity.sitelinks?.commonswiki?.title
-          const cat = stripCategoryPrefix(sitelink)
-          if (cat) {
-            log.debug({ wikidataId: id, commons: cat }, 'Resolved via Commons sitelink (batch)')
-            categoryCache.set(id, cat)
+          const p373Value = entity.claims?.P373?.[0]?.mainsnak?.datavalue?.value
+          if (p373Value) {
+            log.debug({ wikidataId: id, commons: p373Value }, 'Resolved via P373 claim (batch)')
+            categoryCache.set(id, p373Value)
           } else {
-            log.warn({ wikidataId: id }, 'No Commons category found in batch')
-            categoryCache.set(id, null)
+            const sitelink = entity.sitelinks?.commonswiki?.title
+            const cat = stripCategoryPrefix(sitelink)
+            if (cat) {
+              log.debug({ wikidataId: id, commons: cat }, 'Resolved via Commons sitelink (batch)')
+              categoryCache.set(id, cat)
+            } else {
+              log.warn({ wikidataId: id }, 'No Commons category found in batch')
+              categoryCache.set(id, null)
+            }
           }
         }
       }
+      log.debug({ ids: chunk.length, ms: Date.now() - t0 }, 'Wikidata batch request complete')
+    } catch (error) {
+      log.warn({ error, ids: chunk }, 'Wikidata API network error')
+      for (const id of chunk) {
+        categoryCache.set(id, null)
+      }
     }
-    log.debug({ ids: chunk.length, ms: Date.now() - t0 }, 'Wikidata batch request complete')
   }
 }
 
@@ -164,7 +170,7 @@ export const reverseGeocode = (
       for (const row of rows) {
         if (!row.wikidata_id) continue
         const commonsCategory = categoryCache.get(row.wikidata_id)
-        if (commonsCategory !== null && commonsCategory !== undefined) {
+        if (commonsCategory) {
           childLog.info(
             { wikidata: row.wikidata_id, name: row.name, commons: commonsCategory },
             'Boundary matched',

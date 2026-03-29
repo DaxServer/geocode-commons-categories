@@ -4,7 +4,7 @@ import { treaty } from '@elysiajs/eden'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-const client = treaty<App>('http://localhost:5173')
+const client = treaty<App>('')
 
 export const useGeocodeStore = defineStore('geocode', () => {
   const compareResult = ref<GeocodeCompareResponse | null>(null)
@@ -19,7 +19,8 @@ export const useGeocodeStore = defineStore('geocode', () => {
       if (response.data) {
         compareResult.value = response.data
       }
-    } catch {
+    } catch (e) {
+      console.error('Failed to compare geocode', e)
       error.value = 'Failed to compare geocode'
     } finally {
       loading.value = false

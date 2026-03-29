@@ -40,11 +40,6 @@ describe('fetchWithRetry', () => {
 })
 ```
 
-Use test utilities from `packages/backend/src/import/utils/test-utils.ts`:
-- `mockConsole()` - suppress test output
-- `restoreConsole()` - restore after test
-- `getMockedFetchBody()` - extract request body from mock
-
 ### Biome Workflow
 
 - Use `bun biome check --write --unsafe .` to apply all auto-fixes (format + lint)

@@ -98,18 +98,14 @@ export const app = new Elysia()
   .error({
     NOT_FOUND: NotFoundError,
   })
-  .onError(({ code, error }) => {
+  .onError(({ code, error, set }) => {
     console.error('Request error', { code, error })
     if (code === 'NOT_FOUND') {
-      return new Response(JSON.stringify({ error: 'Location not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      set.status = 404
+      return { error: 'Location not found' }
     }
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    set.status = 500
+    return { error: 'Internal server error' }
   })
   .listen(3000, ({ hostname, port }) => {
     console.log(`🦊 Elysia is running at http://${hostname}:${port}`)
