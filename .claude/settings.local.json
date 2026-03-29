@@ -17,7 +17,9 @@
       "Bash(bun lint *)",
       "Bash(bun biome *)",
       "Bash(but status *)",
-      "Bash(but push *)"
+      "Bash(but push *)",
+      "Skill(agent-browser)",
+      "Bash(bun test *)"
     ]
   }
 }

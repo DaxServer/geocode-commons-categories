@@ -8,28 +8,36 @@ This is a TypeScript/Bun/Elysia API that reverse geocodes coordinates to adminis
 
 ## Development Commands
 
-### Running the Application
-
-```bash
-bun dev          # Start the server (entry: src/index.ts)
-bun install      # Install dependencies
-bun add <package>  # Add dependencies
-```
-
 ### Code Quality
 
 ```bash
 bun typecheck    # TypeScript strict mode checking
 bun lint         # Run Biome linter
 bun format       # Auto-format code with Biome
-bun format:check # Format and lint (applies auto-fixes)
 ```
 
-### Data Import
+### Testing
 
 ```bash
-bun import:data         # Run full import pipeline (orchestrator)
-bun import              # Run OSM data fetch to osm_relations table
+bun test                           # Run all tests
+bun test src/import/utils/retry.test.ts  # Run single test file
+bun test --only                   # Run only test.only() marked tests
+bun test -t "pattern"             # Run tests matching name pattern
+bun test --coverage               # Run with coverage report
+```
+
+Tests use Bun's built-in test runner with `bun:test`:
+
+```typescript
+import { describe, expect, mock, test } from 'bun:test'
+import { Effect } from 'effect'
+
+describe('fetchWithRetry', () => {
+  test('should succeed on first attempt', async () => {
+    const result = await Effect.runPromise(fetchWithRetry({ url: '...' }))
+    expect(result).toEqual({ /* expected */ })
+  })
+})
 ```
 
 ### Biome Workflow
@@ -37,44 +45,28 @@ bun import              # Run OSM data fetch to osm_relations table
 - Use `bun biome check --write --unsafe .` to apply all auto-fixes (format + lint)
 - Import type declarations must precede value imports
 - Use single quotes for strings
+- `noUnusedVariables` is disabled for `*.vue` files (Biome can't see template usage from `<script setup>`)
+- `noUnusedImports` is also disabled for `*.vue` files for the same reason
 
 ## Project Structure
 
 ```
-src/
-├── config/env.ts          # Environment configuration (use Bun.env, not process.env)
-├── index.ts               # Elysia app entry point with Effect.runPromise() bridge
-├── services/              # Business logic layer - returns Effect types
-│   ├── database.service.ts    # PostgreSQL connection & queries (Effect-wrapped)
-│   └── geocode.service.ts     # Core reverse geocoding logic
-├── types/                 # TypeScript type definitions
-│   ├── errors.ts              # Custom error classes with _tag discriminator
-│   ├── geocode.types.ts       # API schemas and types
-│   └── import.types.ts        # Data import system types
-└── import/                # Data import system
-    ├── constants.ts           # Import configuration constants
-    ├── import.ts              # OSM data fetch entry point (run import)
-    ├── index.ts               # Main orchestrator (run import:data)
-    ├── database/              # Database operations
-    │   ├── connection.ts       # Database connection pool
-    │   ├── insert.ts           # Insert to osm_relations table
-    │   ├── queries.ts          # All database queries (merged)
-    │   ├── batch.ts            # Batch processing utilities
-    │   ├── verification.ts     # Import verification queries
-    │   └── index.ts            # Batch insert orchestrator
-    ├── fetch/                 # Fetching operations
-    │   ├── relations.ts        # Fetch relation IDs from Overpass
-    │   └── geometry.ts         # Fetch geometries from Overpass
-    ├── transform.ts           # Transform with Wikidata enrichment
-    ├── parent-linking.ts      # Build parent-child relationships
-    └── utils/                 # Shared utilities
-        ├── effect-helpers.ts   # Effect TS helpers (tryAsync)
-        ├── batch.ts            # Batch processing logic
-        ├── wikidata-api.ts     # Wikidata REST API client
-        ├── overpass-import.ts  # Overpass API client for import
-        ├── overpass.ts         # Overpass API client for legacy queries
-        ├── country-codes.ts    # Country code utilities
-        └── logging.ts          # Progress logging
+packages/
+├── backend/                # Backend (Elysia API)
+│   ├── src/
+│   │   ├── config/env.ts   # Environment configuration (use Bun.env, not process.env)
+│   │   ├── index.ts        # Elysia app entry point with Effect.runPromise() bridge
+│   │   ├── services/       # Business logic layer - returns Effect types
+│   │   │   └── nominatim.service.ts # Reverse geocoding with Nominatim
+│   │   └── types/          # TypeScript type definitions
+│   │       ├── errors.ts   # Custom error classes with _tag discriminator
+│   │       └── geocode.types.ts     # API schemas and types
+│   └── tsconfig.json       # TypeScript config for backend
+└── dashboard/             # Frontend (Vue 3 + PrimeVue)
+    ├── src/
+    │   ├── components/     # Vue components
+    │   └── stores/         # Pinia stores
+    └── tsconfig.vue.json   # Vue-specific TypeScript config
 ```
 
 ## Effect TS Integration
@@ -105,12 +97,6 @@ app.get('/', async ({ query }) => {
   )
 })
 ```
-
-### Effect Utilities
-
-Use helpers from `src/import/utils/effect-helpers.ts`:
-- `tryAsync(tryFn, context?)` - Wrap async operations with standard error handling
-- `toError(error)` - Convert unknown errors to Error instances
 
 ### Database Queries
 
@@ -165,148 +151,43 @@ export class DatabaseError extends Error {
 ## Code Style Patterns
 
 - Use `type` aliases instead of `interface` declarations for type definitions
+- Frontend MUST NOT redefine types - use types exposed by Elysia Eden treaty from backend. Backend owns all types.
 - Access properties on `Record<string, string>` index signatures with bracket notation: `obj['key']` (required by TypeScript strict mode)
 - Biome's `useLiteralKeys` rule is disabled to avoid conflicts with TypeScript index signature requirements
 - **Functional composition preferred** over imperative control flow in business logic
-- **Path aliases required**: All internal imports must use `@/import/...` format, never relative imports like `./file`
+- **Path aliases required**:
+  - `@backend/` - backend internal imports (use this instead of relative paths within backend)
+  - `@frontend/` - backend imports from frontend (if needed)
+  - Never use relative imports like `../../` across packages
 
-## Data Import Scripts
+### Naming Conventions
+- PascalCase for types and classes: `GeocodeResponse`, `NotFoundError`
+- camelCase for variables and functions: `reverseGeocode`, `fetchWithRetry`
+- UPPER_SNAKE_CASE for constants: `MAX_ATTEMPTS`, `DELAYS`
+- Do NOT prefix interfaces with `I` - use descriptive names instead
 
-### Import Architecture
+## API Endpoint
 
-The import system uses a **two-table approach**:
-
-1. **`osm_relations` table**: Stores raw OSM data with full geometries
-   - Fetched via `bun import` command
-   - Uses Overpass API to discover relations and fetch full geometries
-   - Stores parent-child relationships between admin levels
-
-2. **`admin_boundaries` table**: Stores enriched data for the main API
-   - Populated by `bun import:data` orchestrator
-   - Enriched with Wikimedia Commons categories from Wikidata
-   - Used by the reverse geocoding API endpoint
-
-### Import Pipeline Flow
-
-```
-Step 1: Import (→ osm_relations)
-  └─ Discover and fetch relation IDs from Overpass API
-  └─ Fetch full geometries from Overpass API
-  └─ Insert to osm_relations table
-
-Step 2: Extract Wikidata IDs (from osm_relations)
-  └─ Query osm_relations for wikidata_id values
-
-Step 3: Fetch Wikidata Categories
-  └─ Batch process up to 50 IDs per request
-  └─ Extract P373 property (Commons category)
-
-Step 4: Transform & Enrich (→ admin_boundaries)
-  └─ Query osm_relations with geometry
-  └─ Merge with Wikidata categories
-  └─ Validate geometries
-  └─ Convert to EWKT format
-
-Step 5: Insert to admin_boundaries
-  └─ Batch insert with transactions
-  └─ ON CONFLICT DO UPDATE for idempotency
-
-Step 6: Verification
-  └─ Query total count and distribution
-  └─ Validate geometries with PostGIS
-```
-
-### Environment Variables for Import
-
-- `COUNTRY_CODE` - ISO country code (optional - if unset, imports all ~250 countries)
-- `ADMIN_LEVEL_START` - Start admin level (default: 4)
-- `ADMIN_LEVEL_END` - End admin level (default: 11)
-- `BATCH_SIZE` - Wikidata API batch size (default: 50)
-- `RATE_LIMIT_MS` - Delay between batches (default: 100)
-- `OUTPUT_DIR` - Optional intermediate file output (code handles null safely)
-- `DATABASE_URL` - PostgreSQL connection string (required for database operations)
-
-## Import System Gotchas
-
-### Wikidata ID Format
-**CRITICAL**: Always preserve "Q" prefix in Wikidata IDs (e.g., "Q240" not "240")
-- OSM tags: `wikidata="Q240"` - extract as-is (only strip URL prefix)
-- Wikidata API: Query with "Q240" - receives category data
-- Database: Store as "Q240" - used for lookups
-- Bug pattern: `.replace('Q', '')` breaks the entire pipeline
-
-### Overpass area IDs
-Use `3600000000 + relationId` to convert relation IDs to area IDs for spatial queries
-- Required for fetching child relations within parent boundaries
-- Example: relation 12345 → area ID 3600012345
-
-### Skip logic in import loops
-Use `continue` not `break` when admin level is empty
-- Preserves parent chain for next level search
-- Allows graceful handling of missing admin levels
-
-### Overpass API Query Format
-The import system uses `out geom;` to fetch full polygon geometries from Overpass API
-- **Discovery queries** use `out ids;` for fast relation ID lookup (no geometry)
-- **Geometry fetch** uses `out geom;` to fetch complete polygon data
-- This provides accurate boundary representations (not simplified bounding boxes)
-- Trade-off: Full geometries may be slower and may timeout for very large countries
-
-### Overpass API Requirements
-**CRITICAL**: Overpass API requires specific request patterns to avoid rate limiting:
-- **User-Agent header**: Must identify your application (added in `src/import/utils/retry.ts`)
-- **Sequential requests**: Only one request at a time (no parallel requests)
-- Countries are processed sequentially within batches, not in parallel
-- See: `importCountriesBatch()` in `src/import/import.ts`
-
-### Overpass API Rate Limiting
-**CRITICAL**: Overpass API uses slot-based rate limiting - requests occupy slots for "execution time + cool down time":
-- **Cool down time**: Grows with server load (can be 2-3x execution time during high load)
-- **Slot mechanism**: Each user gets ~2 slots; requests wait 15s then get HTTP 429 if no slot available
-- **Working delays** (in `src/import/constants.ts`):
-  - `OVERPASS_GEOMETRY_MS`: 30000ms (30 seconds between geometry batches)
-  - `OVERPASS_RELATION_MS`: 30000ms (30 seconds between relation ID fetches)
-  - `COUNTRY_BATCH_MS`: 30000ms (30 seconds between country batches)
-  - `RATE_LIMIT_PENALTY_MS`: 120000ms (2-minute penalty cooldown after any HTTP 429)
-- **Batch size**: `OVERPASS_GEOMETRY` = 15 relations per batch (reduced from 25 for faster execution)
-- **Retry config**: `MAX_ATTEMPTS` = 5, `PENALTY_ENABLED` = true for aggressive rate limit avoidance
-- **All sequential API calls need delays**: Add `Effect.sleep()` between iterations (see `src/import/fetch/relations.ts`)
-- **Sleep logging**: Always log "Waiting {X}s..." before and "Wait complete, resuming" after sleep calls
-- **Reference**: https://dev.overpass-api.de/overpass-doc/en/preface/commons.html
-
-### Import System Logging Pattern
-All import operations use standardized logging format: `[Category] Message (duration)`
-- **Categories**: [OverpassAPI], [RateLimiter], [Geometry], [Database], [Import]
-- **Example**: `[OverpassAPI] Found 15 relations (0.4s)`
-- **Sleep operations**: Log both start and end for transparency during long delays
-  - Start: `[RateLimiter] Waiting 30s before next batch`
-  - End: `[RateLimiter] Wait complete, resuming`
-- **Duration formatting**: Always use seconds with 1 decimal place (e.g., `8.2s`)
-
-### API Endpoint
 Reverse geocoding endpoint is `/geocode?lat={lat}&lon={lon}`, not root path
 - Correct: `curl "http://localhost:3000/geocode?lat=50.85&lon=4.35"`
 - Incorrect: `curl "http://localhost:3000/?lat=50.85&lon=4.35"` (returns 404)
 
-### Docker Workflow After Import
-After running `bun import:data`, restart the app container to refresh database connection pool
-- Connection pool initializes before import completes
-- `docker compose restart app` fixes "Location not found" errors post-import
+## Wikidata ID Handling
 
-### Database Migrations
-- **Auto-migration (docker-compose)**: Migrations in `migrations/` mount to `/docker-entrypoint-initdb.d` and run automatically on postgres container start
-- **Manual migration**: `psql -d your_database -f migrations/001_initial_schema.sql`
-- **Production/K8s**: Migrations run in Elysia `.listen()` callback when `NODE_ENV=production` (see `src/db/migrate.ts`)
+**CRITICAL**: Always preserve "Q" prefix in Wikidata IDs:
+- OSM tags: `wikidata="Q240"` → extract as-is
+- Wikidata API: Query with "Q240"
+- Database: Store as "Q240"
+- Never strip with `.replace('Q', '')` - breaks entire pipeline
 
 ## Runtime Environment
 
-- **Runtime**: Bun 1.3.8 (required - specified in `package.json` engines field)
+- **Runtime**: Bun (required - specified in `package.json` engines field)
 - **Language**: TypeScript with ESNext target
 - **Module System**: ES modules (type: "module" in package.json)
-- **Framework**: Elysia 1.4.22 (type-safe web framework)
-- **Functional Library**: Effect TS 3.19.15 (error handling and composition)
+- **Framework**: Elysia (type-safe web framework)
+- **Functional Library**: Effect TS (error handling and composition)
 - **Database**: PostgreSQL with PostGIS extension
-- **Testing**: None currently implemented
 
 ## TypeScript Configuration
 
@@ -318,23 +199,7 @@ The project uses strict TypeScript configuration with several safety features en
 - `noFallthroughCasesInSwitch` - prevents switch statement fallthrough errors
 - `verbatimModuleSyntax` - requires explicit type imports
 
-## Database Setup
-
-1. Run migration: `psql -d your_database -f migrations/001_initial_schema.sql`
-2. Configure `DATABASE_URL` in environment variables (see `.env.example`)
-3. Import boundary data: `bun import:data` (requires COUNTRY_CODE and other env vars)
-
-### Database Schema
-
-- **`osm_relations` table**: Stores raw OSM hierarchical data
-  - Columns: id, wikidata_id, admin_level, name, geom (PostGIS), iso3, parent_id
-  - Used as source for Wikidata enrichment and admin_boundaries population
-- **`admin_boundaries` table**: Enriched data for reverse geocoding API
-  - Columns: wikidata_id, commons_category, admin_level, name, geom (PostGIS)
-  - Used by the main API endpoint `/geocode`
-- **Indexes**: GIST spatial index, admin_level, wikidata_id
-- **Spatial queries**: ST_Contains() for point-in-polygon checks
-- **Connection pooling**: Singleton pattern in `getPool()`
+The root `tsconfig.json` handles both backend and frontend packages via `include`, while `packages/dashboard/tsconfig.vue.json` provides Vue-specific configuration.
 
 ## Docker Development
 
@@ -347,21 +212,11 @@ docker compose logs app   # View app logs
 docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
 ```
 
-### Docker Services
-
-- **postgres**: PostgreSQL 17 + PostGIS 3.4 Alpine, exposes port 5432
-- **app**: Bun API server, exposes port 3000
-
-### Docker Compose Patterns
-
-- Use `docker compose` (modern syntax, not `docker-compose`)
-- Migrations in `migrations/` directory mount to `/docker-entrypoint-initdb.d` and run automatically on postgres start
-- Use `IF NOT EXISTS` in migrations for idempotency (safe to re-run with fresh volumes)
-- Always test Docker changes with `docker compose down -v && docker compose up -d` before committing
-
 ## Environment Variables
 
-Env var types are declared in `env.d.ts` (project root) via `declare module 'bun' { interface Env { ... } }`. Add new env vars there — required vars typed as `string`, optional as `string | undefined`. This allows dot notation on `Bun.env` despite `noPropertyAccessFromIndexSignature`. **`env.d.ts` already exists — never recreate it, only add to it.**
+Env var types are declared in `env.d.ts` (project root) via `declare module 'bun' { interface Env { ... } }`. Add new env vars there — required vars typed as `string`, optional as `string | undefined`. **`env.d.ts` already exists — never recreate it, only add to it.**
+
+Use `Bun.env.VARIABLE_NAME` - never `process.env`.
 
 ## Nominatim Integration
 
@@ -381,7 +236,11 @@ The `/geocode` endpoint queries a Nominatim PostgreSQL instance directly at runt
 ### Commons Category Resolution
 - `extratags->'wikimedia_commons'` contains the category **with** `Category:` prefix — strip it before use
 - If absent, fall back to Wikidata API (P373 claim, then commonswiki sitelink)
+- If P373 and sitelink are missing, check P910 (topic's main category) property and fetch that entity's category
 - Wikidata results are cached in-memory (`categoryCache` Map)
+
+### Name Resolution
+- Use `COALESCE(name->'name:en', name->'name')` to get English name first, fallback to local name
 
 ### Logging
 - Uses `@bogeychan/elysia-logger` (pino) — `ctx.log` available in route handlers
