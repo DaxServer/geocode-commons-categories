@@ -1,5 +1,6 @@
 out
 dist
+!packages/dashboard/dist
 *.tgz
 .env
 .env.*

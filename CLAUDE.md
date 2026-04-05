@@ -212,6 +212,14 @@ docker compose logs app   # View app logs
 docker compose exec postgres psql -U geocode -d geocode  # Connect to DB
 ```
 
+## Production Build
+
+GH Actions builds the frontend (`bun --cwd packages/dashboard build` → `packages/dashboard/dist`) and runs `bun install` before building the Docker image. The Dockerfile does not build the frontend or install dependencies — it only runs the backend.
+
+The backend serves the built frontend via `@elysiajs/static` (prefix `/`) and a `/*` wildcard route that returns `index.html` for SPA navigation. `DASHBOARD_DIST` is resolved using `import.meta.dir` (not CWD) since CWD differs between dev and Docker.
+
+`.dockerignore` excludes `dist` broadly but allows `packages/dashboard/dist` via negation rule.
+
 ## Environment Variables
 
 Env var types are declared in `env.d.ts` (project root) via `declare module 'bun' { interface Env { ... } }`. Add new env vars there — required vars typed as `string`, optional as `string | undefined`. **`env.d.ts` already exists — never recreate it, only add to it.**

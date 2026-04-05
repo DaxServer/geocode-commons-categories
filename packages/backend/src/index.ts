@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { closeNominatimPool, reverseGeocode } from '@backend/services/nominatim.service'
 import { NotFoundError } from '@backend/types/errors'
 import {
@@ -8,8 +9,11 @@ import {
   geocodeResponseSchema,
 } from '@backend/types/geocode.types'
 import { logger } from '@bogeychan/elysia-logger'
+import { staticPlugin } from '@elysiajs/static'
 import { Effect } from 'effect'
 import { Elysia, t } from 'elysia'
+
+const DASHBOARD_DIST = join(import.meta.dir, '../../dashboard/dist')
 
 // Helper to run Effect and return null on any error
 const runOrNull = async <A, E>(effect: Effect.Effect<A, E>): Promise<A | null> => {
@@ -94,6 +98,14 @@ export const app = new Elysia()
       response: geocodeCompareSchema,
     },
   )
+  .use(staticPlugin({ assets: DASHBOARD_DIST, prefix: '/' }))
+  .get('/*', ({ headers, set }) => {
+    if (headers['accept']?.includes('text/html')) {
+      return Bun.file(join(DASHBOARD_DIST, 'index.html'))
+    }
+    set.status = 404
+    return { error: 'Not Found' }
+  })
   .error({
     NOT_FOUND: NotFoundError,
   })
