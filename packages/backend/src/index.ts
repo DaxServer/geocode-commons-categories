@@ -9,7 +9,6 @@ import {
   geocodeResponseSchema,
 } from '@backend/types/geocode.types'
 import { logger } from '@bogeychan/elysia-logger'
-import { staticPlugin } from '@elysiajs/static'
 import { Effect } from 'effect'
 import { Elysia, t } from 'elysia'
 
@@ -98,14 +97,8 @@ export const app = new Elysia()
       response: geocodeCompareSchema,
     },
   )
-  .use(staticPlugin({ assets: DASHBOARD_DIST, prefix: '/' }))
-  .get('/*', ({ headers, set }) => {
-    if (headers['accept']?.includes('text/html')) {
-      return Bun.file(join(DASHBOARD_DIST, 'index.html'))
-    }
-    set.status = 404
-    return { error: 'Not Found' }
-  })
+  .get('/', () => Bun.file(join(DASHBOARD_DIST, 'index.html')))
+  .get('/assets/*', ({ params }) => Bun.file(join(DASHBOARD_DIST, 'assets', params['*'])))
   .error({
     NOT_FOUND: NotFoundError,
   })
