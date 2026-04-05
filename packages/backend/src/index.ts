@@ -99,13 +99,6 @@ export const app = new Elysia()
     },
   )
   .use(staticPlugin({ assets: DASHBOARD_DIST, prefix: '/' }))
-  .get('/*', ({ headers, set }) => {
-    if (headers['accept']?.includes('text/html')) {
-      return Bun.file(join(DASHBOARD_DIST, 'index.html'))
-    }
-    set.status = 404
-    return { error: 'Not Found' }
-  })
   .error({
     NOT_FOUND: NotFoundError,
   })
