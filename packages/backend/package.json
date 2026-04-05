@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@bogeychan/elysia-logger": "^0.1.10",
-    "@elysiajs/static": "^1.4.7",
     "effect": "catalog:",
     "elysia": "catalog:",
     "pg": "^8.20.0",
