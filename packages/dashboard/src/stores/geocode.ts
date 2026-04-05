@@ -4,7 +4,7 @@ import { treaty } from '@elysiajs/eden'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-const client = treaty<App>('http://localhost:5173')
+const client = treaty<App>(window.location.origin)
 
 export const useGeocodeStore = defineStore('geocode', () => {
   const compareResult = ref<GeocodeCompareResponse | null>(null)
