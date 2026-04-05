@@ -6,4 +6,4 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["bun", "src/index.ts"]
+CMD ["bun", "packages/backend/src/index.ts"]
