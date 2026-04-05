@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "bun --bun vue-tsc --noEmit",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc -b tsconfig.vue.json && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
