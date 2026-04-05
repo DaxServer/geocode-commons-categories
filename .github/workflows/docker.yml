@@ -29,7 +29,9 @@ jobs:
         with:
           bun-version: ${{ steps.determine-bun-version.outputs.BUN_VERSION }}
 
-      - run: bun install --frozen-lockfile --production
+      - run: bun install --frozen-lockfile
+
+      - run: bun --cwd packages/dashboard build
 
       - uses: docker/login-action@v3
         with:
